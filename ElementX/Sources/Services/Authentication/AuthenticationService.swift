@@ -64,7 +64,7 @@ class AuthenticationService: AuthenticationServiceProtocol {
         }
         
         // When updating these, don't forget to update the reset method too.
-        homeserverSubject = .init(LoginHomeserver(serverNameOrBaseURL: appSettings.defaultAccountProvider.serverNameOrBaseURL, loginMode: .unknown))
+        homeserverSubject = .init(LoginHomeserver(accountProvider: appSettings.defaultAccountProvider, loginMode: .unknown))
         flow = .login
     }
     
@@ -72,7 +72,7 @@ class AuthenticationService: AuthenticationServiceProtocol {
     
     func configure(for serverNameOrBaseURL: String, flow: AuthenticationFlow) async -> Result<Void, AuthenticationServiceError> {
         do {
-            var homeserver = LoginHomeserver(serverNameOrBaseURL: serverNameOrBaseURL, loginMode: .unknown)
+            var homeserver = LoginHomeserver(accountProvider: .generic(serverNameOrBaseURL), loginMode: .unknown)
             
             let client = try await makeClient(serverNameOrBaseURL: serverNameOrBaseURL)
             let loginDetails = await client.homeserverLoginDetails()
@@ -202,7 +202,8 @@ class AuthenticationService: AuthenticationServiceProtocol {
         }
         
         // When account provider selection is restricted, make sure the scanned server is allowed.
-        if !appSettings.allowOtherAccountProviders {
+        // However, generic providers aren't detailed enough, so continue if one is present.
+        if !appSettings.allowOtherAccountProviders, !appSettings.accountProviders.contains(where: \.isGeneric) {
             // A base URL from the QR code is expected to be a valid URL when present.
             let scannedBaseURL = qrData.baseUrl().flatMap(URL.init(string:))
             
@@ -252,7 +253,7 @@ class AuthenticationService: AuthenticationServiceProtocol {
     }
     
     func reset() {
-        homeserverSubject.send(LoginHomeserver(serverNameOrBaseURL: appSettings.defaultAccountProvider.serverNameOrBaseURL, loginMode: .unknown))
+        homeserverSubject.send(LoginHomeserver(accountProvider: appSettings.defaultAccountProvider, loginMode: .unknown))
         flow = .login
         client = nil
     }
