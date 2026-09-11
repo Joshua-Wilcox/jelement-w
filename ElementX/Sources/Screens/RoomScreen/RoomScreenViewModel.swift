@@ -282,7 +282,7 @@ class RoomScreenViewModel: RoomScreenViewModelType, RoomScreenViewModelProtocol 
         }
         
         guard let userIdentity else {
-            MXLog.failure("User identity should be known at this point")
+            MXLog.error("User identity should be known at this point")
             state.dmRecipientDetails.verification = .notVerified
             return
         }

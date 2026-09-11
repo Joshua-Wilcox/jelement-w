@@ -235,7 +235,7 @@ nonisolated struct AttributedStringBuilder: AttributedStringBuilderProtocol {
                 } else {
                     content.addAttribute(.InlineCode, value: true, range: NSRange(location: 0, length: content.length))
                     // But inline code is (obviously) inline so it's much easier to set the background colour here.
-                    content.addAttribute(.backgroundColor, value: UIColor.compound._bgCodeBlock as Any, range: NSRange(location: 0, length: content.length))
+                    content.addAttribute(.backgroundColor, value: CompoundUIColors.Nonisolated._bgCodeBlock as Any, range: NSRange(location: 0, length: content.length))
                 }
                 
                 // Don't allow identifiers or links in code.
