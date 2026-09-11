@@ -10,6 +10,10 @@ import Foundation
 // swiftlint:disable explicit_type_interface function_parameter_count identifier_name line_length
 // swiftlint:disable nesting type_body_length type_name vertical_whitespace_opening_braces
 internal nonisolated enum UntranslatedL10n {
+  /// Pause recording
+  internal static var a11yVoiceMessagePauseRecordingIos: String { return UntranslatedL10n.tr("Untranslated", "a11y_voice_message_pause_recording_ios") }
+  /// Resume recording
+  internal static var a11yVoiceMessageResumeRecordingIos: String { return UntranslatedL10n.tr("Untranslated", "a11y_voice_message_resume_recording_ios") }
   /// Transcribe
   internal static var actionTranscribeIos: String { return UntranslatedL10n.tr("Untranslated", "action_transcribe_ios") }
   /// Transcribing…

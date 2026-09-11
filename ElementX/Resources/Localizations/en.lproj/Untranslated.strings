@@ -1,3 +1,5 @@
+"a11y_voice_message_pause_recording_ios" = "Pause recording";
+"a11y_voice_message_resume_recording_ios" = "Resume recording";
 "action_transcribe_ios" = "Transcribe";
 "common_transcribing_ios" = "Transcribing…";
 "error_voice_message_transcription_failed_ios" = "Couldn’t transcribe this voice message.";

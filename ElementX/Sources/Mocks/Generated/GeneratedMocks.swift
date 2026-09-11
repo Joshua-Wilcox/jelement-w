@@ -1568,6 +1568,44 @@ nonisolated class AudioRecorderMock: AudioRecorderProtocol, @unchecked Sendable 
         }
     }
 }
+nonisolated class AudioSegmentMergerMock: AudioSegmentMergerProtocol, @unchecked Sendable {
+
+    //MARK: - merge
+
+    nonisolated(unsafe) var mergeIntoThrowableError: Error?
+    private let mergeIntoCallsCountLock = NSLock()
+    private nonisolated(unsafe) var mergeIntoUnderlyingCallsCount = 0
+    var mergeIntoCallsCount: Int {
+        get { mergeIntoCallsCountLock.withLock { mergeIntoUnderlyingCallsCount } }
+        set { mergeIntoCallsCountLock.withLock { mergeIntoUnderlyingCallsCount = newValue } }
+    }
+    var mergeIntoCalled: Bool {
+        return mergeIntoCallsCount > 0
+    }
+    private let mergeIntoReceivedArgumentsLock = NSLock()
+    private nonisolated(unsafe) var mergeIntoUnderlyingReceivedArguments: (segmentURLs: [URL], destinationURL: URL)?
+    var mergeIntoReceivedArguments: (segmentURLs: [URL], destinationURL: URL)? {
+        get { mergeIntoReceivedArgumentsLock.withLock { mergeIntoUnderlyingReceivedArguments } }
+        set { mergeIntoReceivedArgumentsLock.withLock { mergeIntoUnderlyingReceivedArguments = newValue } }
+    }
+    private let mergeIntoReceivedInvocationsLock = NSLock()
+    private nonisolated(unsafe) var mergeIntoUnderlyingReceivedInvocations: [(segmentURLs: [URL], destinationURL: URL)] = []
+    var mergeIntoReceivedInvocations: [(segmentURLs: [URL], destinationURL: URL)] {
+        get { mergeIntoReceivedInvocationsLock.withLock { mergeIntoUnderlyingReceivedInvocations } }
+        set { mergeIntoReceivedInvocationsLock.withLock { mergeIntoUnderlyingReceivedInvocations = newValue } }
+    }
+    nonisolated(unsafe) var mergeIntoClosure: (([URL], URL) async throws -> Void)?
+
+    @concurrent func merge(_ segmentURLs: [URL], into destinationURL: URL) async throws {
+        if let error = mergeIntoThrowableError {
+            throw error
+        }
+        mergeIntoCallsCountLock.withLock { mergeIntoUnderlyingCallsCount += 1 }
+        mergeIntoReceivedArguments = (segmentURLs: segmentURLs, destinationURL: destinationURL)
+        mergeIntoReceivedInvocationsLock.withLock { mergeIntoUnderlyingReceivedInvocations.append((segmentURLs: segmentURLs, destinationURL: destinationURL)) }
+        try await mergeIntoClosure?(segmentURLs, destinationURL)
+    }
+}
 nonisolated class AudioSessionMock: AudioSessionProtocol, @unchecked Sendable {
 
     //MARK: - requestRecordPermission
@@ -14665,6 +14703,23 @@ nonisolated class VoiceMessageRecorderMock: VoiceMessageRecorderProtocol, @unche
     @concurrent func stopRecording() async {
         stopRecordingCallsCountLock.withLock { stopRecordingUnderlyingCallsCount += 1 }
         await stopRecordingClosure?()
+    }
+    //MARK: - resumeRecording
+
+    private let resumeRecordingCallsCountLock = NSLock()
+    private nonisolated(unsafe) var resumeRecordingUnderlyingCallsCount = 0
+    var resumeRecordingCallsCount: Int {
+        get { resumeRecordingCallsCountLock.withLock { resumeRecordingUnderlyingCallsCount } }
+        set { resumeRecordingCallsCountLock.withLock { resumeRecordingUnderlyingCallsCount = newValue } }
+    }
+    var resumeRecordingCalled: Bool {
+        return resumeRecordingCallsCount > 0
+    }
+    nonisolated(unsafe) var resumeRecordingClosure: (() async -> Void)?
+
+    @concurrent func resumeRecording() async {
+        resumeRecordingCallsCountLock.withLock { resumeRecordingUnderlyingCallsCount += 1 }
+        await resumeRecordingClosure?()
     }
     //MARK: - cancelRecording
 

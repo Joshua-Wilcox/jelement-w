@@ -423,12 +423,11 @@ class TimelineViewModel: TimelineViewModelType, TimelineViewModelProtocol {
     private func processVoiceMessageAction(_ action: ComposerToolbarVoiceMessageAction) {
         switch action {
         case .startRecording:
-            Task {
-                await mediaPlayerProvider.detachAllStates(except: nil)
-                await timelineInteractionHandler.startRecordingVoiceMessage()
-            }
+            Task { await timelineInteractionHandler.startRecordingVoiceMessage() }
         case .stopRecording:
             Task { await timelineInteractionHandler.stopRecordingVoiceMessage() }
+        case .resumeRecording:
+            Task { await timelineInteractionHandler.resumeRecordingVoiceMessage() }
         case .cancelRecording:
             Task { await timelineInteractionHandler.cancelRecordingVoiceMessage() }
         case .deleteRecording:

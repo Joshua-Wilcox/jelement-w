@@ -13,7 +13,9 @@ import WysiwygComposer
 
 enum ComposerToolbarVoiceMessageAction {
     case startRecording
+    /// Pauses the recording, keeping what has been recorded so far.
     case stopRecording
+    case resumeRecording
     case cancelRecording
     case deleteRecording
     case startPlayback
@@ -72,6 +74,8 @@ struct ComposerToolbarViewState: BindableState {
     
     var composerMode: ComposerMode = .default
     var composerEmpty = true
+    /// Whether the voice message being recorded has captured any audio yet.
+    var voiceMessageHasAudio = false
     /// Could be false if sending is disabled in the room
     var canSend = true
     var suggestions: [SuggestionItem] = []
@@ -94,9 +98,7 @@ struct ComposerToolbarViewState: BindableState {
     
     var showSendButton: Bool {
         switch composerMode {
-        case .recordVoiceMessage:
-            return false
-        case .previewVoiceMessage:
+        case .recordVoiceMessage, .previewVoiceMessage:
             return true
         default:
             if bindings.composerFormattingEnabled {
@@ -118,6 +120,10 @@ struct ComposerToolbarViewState: BindableState {
     var sendButtonDisabled: Bool {
         if !canSend {
             return true
+        }
+        
+        if case .recordVoiceMessage = composerMode {
+            return !voiceMessageHasAudio
         }
         
         if case .previewVoiceMessage = composerMode {

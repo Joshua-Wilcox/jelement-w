@@ -35,6 +35,11 @@ struct ComposerToolbar: View {
         Compound.supportsGlass ? 0 : 3
     }
     
+    /// The height of the delete button, which the pause and resume button floats above.
+    private var voiceMessageTrashButtonSize: CGFloat {
+        Compound.supportsGlass ? 44 : 30
+    }
+    
     var body: some View {
         VStack(spacing: 8) {
             topBar
@@ -106,7 +111,7 @@ struct ComposerToolbar: View {
                     sendButton
                         .scaledPadding(.vertical, trailingButtonVerticalPadding, relativeTo: .compound.headingLG)
                 } else {
-                    voiceMessageRecordingButton(mode: context.viewState.isVoiceMessageModeActivated ? .recording : .idle)
+                    startRecordingButton
                         .scaledPadding(.vertical, trailingButtonVerticalPadding, relativeTo: .compound.headingLG)
                 }
             }
@@ -295,11 +300,26 @@ struct ComposerToolbar: View {
         }
     }
     
-    private func voiceMessageRecordingButton(mode: VoiceMessageRecordingButtonMode) -> some View {
-        VoiceMessageRecordingButton(mode: mode) {
+    private var startRecordingButton: some View {
+        VoiceMessageRecordingButton(mode: .record) {
             context.send(viewAction: .voiceMessage(.startRecording))
-        } stopRecording: {
-            context.send(viewAction: .voiceMessage(.stopRecording))
+        }
+    }
+    
+    /// The button that pauses and resumes the recording, floating above the delete button.
+    @ViewBuilder
+    private var pauseResumeRecordingButton: some View {
+        switch context.viewState.composerMode {
+        case .recordVoiceMessage:
+            VoiceMessageRecordingButton(mode: .pause) {
+                context.send(viewAction: .voiceMessage(.stopRecording))
+            }
+        case .previewVoiceMessage(_, _, let isUploading) where !isUploading:
+            VoiceMessageRecordingButton(mode: .resume) {
+                context.send(viewAction: .voiceMessage(.resumeRecording))
+            }
+        default:
+            EmptyView()
         }
     }
     
@@ -308,6 +328,10 @@ struct ComposerToolbar: View {
             context.send(viewAction: .voiceMessage(.deleteRecording))
         }
         .accessibilityLabel(L10n.a11yDelete)
+        .overlay(alignment: .bottom) {
+            pauseResumeRecordingButton
+                .scaledOffset(y: -(voiceMessageTrashButtonSize + 8), relativeTo: .compound.headingLG)
+        }
     }
     
     private func voiceMessagePreviewComposer(audioPlayerState: AudioPlayerState, waveform: WaveformSource) -> some View {

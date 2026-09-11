@@ -43,6 +43,7 @@ final class ComposerToolbarViewModel: ComposerToolbarViewModelType, ComposerTool
     private var currentLinkData: WysiwygLinkData?
     
     private var replyLoadingTask: Task<Void, Never>?
+    private var voiceMessageRecordingObserver: AnyCancellable?
     
     init(initialText: String? = nil,
          roomProxy: JoinedRoomProxyProtocol,
@@ -187,10 +188,8 @@ final class ComposerToolbarViewModel: ComposerToolbarViewModelType, ComposerTool
             guard !state.sendButtonDisabled else { return }
             
             switch state.composerMode {
-            case .previewVoiceMessage:
+            case .recordVoiceMessage, .previewVoiceMessage:
                 actionsSubject.send(.voiceMessage(.send))
-            case .recordVoiceMessage:
-                MXLog.warning("Ignoring send action while recording a voice message.")
             default:
                 if context.composerFormattingEnabled {
                     actionsSubject.send(.sendMessage(plain: wysiwygViewModel.content.markdown,
@@ -460,6 +459,8 @@ final class ComposerToolbarViewModel: ComposerToolbarViewModelType, ComposerTool
             actionsSubject.send(.voiceMessage(.startRecording))
         case .stopRecording:
             actionsSubject.send(.voiceMessage(.stopRecording))
+        case .resumeRecording:
+            actionsSubject.send(.voiceMessage(.resumeRecording))
         case .cancelRecording:
             actionsSubject.send(.voiceMessage(.cancelRecording))
         case .deleteRecording:
@@ -577,10 +578,14 @@ final class ComposerToolbarViewModel: ComposerToolbarViewModelType, ComposerTool
         
         state.composerMode = mode
         switch mode {
-        case .default:
-            break
-        case .recordVoiceMessage, .previewVoiceMessage:
-            break
+        case .default, .previewVoiceMessage:
+            voiceMessageRecordingObserver = nil
+        case .recordVoiceMessage(let recorderState):
+            // The message can't be sent until the recorder has captured something.
+            voiceMessageRecordingObserver = recorderState.$duration
+                .map { $0 > 0 }
+                .removeDuplicates()
+                .weakAssign(to: \.state.voiceMessageHasAudio, on: self)
         case .edit, .reply:
             // Focus composer when switching to reply/edit
             state.bindings.composerFocused = true
@@ -833,6 +838,7 @@ extension ComposerToolbarViewModel {
             viewModel.state.composerMode = .edit(originalEventOrTransactionID: .eventID(""), type: .default)
         case .recordVoiceMessage:
             viewModel.state.composerMode = .recordVoiceMessage(state: AudioRecorderState())
+            viewModel.state.voiceMessageHasAudio = true
         case .previewVoiceMessage(let isUploading):
             viewModel.state.composerMode = .previewVoiceMessage(state: AudioPlayerState(id: .recorderPreview,
                                                                                         title: L10n.commonVoiceMessage,

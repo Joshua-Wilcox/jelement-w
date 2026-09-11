@@ -14,6 +14,7 @@ enum VoiceMessageRecorderError: Error {
     case previewNotAvailable
     case audioRecorderError(AudioRecorderError)
     case waveformAnalysisError
+    case failedMergingSegments
     case failedSendingVoiceMessage
 }
 
@@ -31,7 +32,11 @@ protocol VoiceMessageRecorderProtocol {
     var actions: AnyPublisher<VoiceMessageRecorderAction, Never> { get }
     
     func startRecording() async
+    /// Stops recording, keeping what has been recorded so far so that it can be
+    /// played back, resumed or sent.
     func stopRecording() async
+    /// Records a new segment of a stopped recording, appending it to the previous ones.
+    func resumeRecording() async
     func cancelRecording() async
     func startPlayback() async -> Result<Void, VoiceMessageRecorderError>
     func pausePlayback()
