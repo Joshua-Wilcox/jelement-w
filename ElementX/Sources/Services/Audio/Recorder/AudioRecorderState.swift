@@ -26,10 +26,15 @@ class AudioRecorderState: ObservableObject, Identifiable {
     private weak var audioRecorder: AudioRecorderProtocol?
     private var cancellables: Set<AnyCancellable> = []
     private var displayLink: CADisplayLink?
+    /// The duration of the segments that were recorded before the recording was last resumed.
+    private var durationOffset: TimeInterval = 0
     
     func attachAudioRecorder(_ audioRecorder: AudioRecorderProtocol) {
         recordingState = .stopped
+        // The recorder's clock restarts for every segment of the recording, so carry over what came before.
+        durationOffset = duration
         self.audioRecorder = audioRecorder
+        cancellables = []
         subscribeToAudioRecorder(audioRecorder)
         if audioRecorder.isRecording {
             recordingState = .recording
@@ -92,7 +97,7 @@ class AudioRecorderState: ObservableObject, Identifiable {
     // periphery:ignore:parameters displayLink - required for objc selector
     @objc private func publishUpdate(displayLink: CADisplayLink) {
         if let currentTime = audioRecorder?.currentTime {
-            duration = currentTime
+            duration = durationOffset + currentTime
         }
         if let averagePower = audioRecorder?.averagePower() {
             waveformSamples.append(1.0 - averagePower)

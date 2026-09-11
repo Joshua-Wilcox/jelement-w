@@ -77,6 +77,27 @@ struct AudioRecorderStateTests {
     }
     
     @Test
+    func reattachingKeepsTheRecordingsWaveformAndDuration() async throws {
+        audioRecorderMock.isRecording = true
+        audioRecorderMock.currentTime = 4
+        audioRecorderState.attachAudioRecorder(audioRecorderMock)
+        
+        let deferred = deferFulfillment(audioRecorderState.$duration) { $0 == 4 }
+        try await deferred.fulfill()
+        let waveformSamples = audioRecorderState.waveformSamples
+        #expect(!waveformSamples.isEmpty)
+        
+        // Resuming the recording restarts the recorder's own clock.
+        audioRecorderMock.currentTime = 0
+        audioRecorderState.attachAudioRecorder(audioRecorderMock)
+        audioRecorderMock.currentTime = 3
+        
+        let deferredResumed = deferFulfillment(audioRecorderState.$duration) { $0 == 7 }
+        try await deferredResumed.fulfill()
+        #expect(audioRecorderState.waveformSamples.count > waveformSamples.count)
+    }
+    
+    @Test
     func handlingAudioPlayerActionDidStopRecording() async throws {
         audioRecorderState.attachAudioRecorder(audioRecorderMock)
         

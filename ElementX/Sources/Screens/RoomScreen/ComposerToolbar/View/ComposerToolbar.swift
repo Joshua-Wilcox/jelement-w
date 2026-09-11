@@ -35,6 +35,11 @@ struct ComposerToolbar: View {
         Compound.supportsGlass ? 0 : 3
     }
     
+    /// The height of the trailing button, which the voice message recording button floats above.
+    private var trailingButtonSize: CGFloat {
+        Compound.supportsGlass ? 44 : 36
+    }
+    
     var body: some View {
         VStack(spacing: 8) {
             topBar
@@ -106,10 +111,14 @@ struct ComposerToolbar: View {
                     sendButton
                         .scaledPadding(.vertical, trailingButtonVerticalPadding, relativeTo: .compound.headingLG)
                 } else {
-                    voiceMessageRecordingButton(mode: context.viewState.isVoiceMessageModeActivated ? .recording : .idle)
+                    startRecordingButton
                         .scaledPadding(.vertical, trailingButtonVerticalPadding, relativeTo: .compound.headingLG)
                 }
             }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            pauseResumeRecordingButton
+                .scaledOffset(y: -(trailingButtonSize + trailingButtonVerticalPadding + 8), relativeTo: .compound.headingLG)
         }
         .animation(.linear(duration: 0.15), value: context.viewState.composerMode)
     }
@@ -295,11 +304,26 @@ struct ComposerToolbar: View {
         }
     }
     
-    private func voiceMessageRecordingButton(mode: VoiceMessageRecordingButtonMode) -> some View {
-        VoiceMessageRecordingButton(mode: mode) {
+    private var startRecordingButton: some View {
+        VoiceMessageRecordingButton(mode: .record) {
             context.send(viewAction: .voiceMessage(.startRecording))
-        } stopRecording: {
-            context.send(viewAction: .voiceMessage(.stopRecording))
+        }
+    }
+    
+    /// The button that pauses and resumes the recording, floating above the send button.
+    @ViewBuilder
+    private var pauseResumeRecordingButton: some View {
+        switch context.viewState.composerMode {
+        case .recordVoiceMessage:
+            VoiceMessageRecordingButton(mode: .pause) {
+                context.send(viewAction: .voiceMessage(.stopRecording))
+            }
+        case .previewVoiceMessage(_, _, let isUploading) where !isUploading:
+            VoiceMessageRecordingButton(mode: .resume) {
+                context.send(viewAction: .voiceMessage(.resumeRecording))
+            }
+        default:
+            EmptyView()
         }
     }
     

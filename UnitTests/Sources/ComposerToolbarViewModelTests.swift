@@ -201,6 +201,34 @@ final class ComposerToolbarViewModelTests {
         try await deferred.fulfill()
     }
     
+    // MARK: - Voice messages
+    
+    @Test
+    func sendButtonIsShownWhilstRecordingAVoiceMessage() {
+        viewModel.process(timelineAction: .setMode(mode: .recordVoiceMessage(state: AudioRecorderState())))
+        
+        #expect(viewModel.state.showSendButton)
+        // Nothing has been recorded yet, so there's nothing to send.
+        #expect(viewModel.state.sendButtonDisabled)
+    }
+    
+    @Test
+    func sendingWhilstRecordingSendsTheVoiceMessage() async throws {
+        viewModel.process(timelineAction: .setMode(mode: .recordVoiceMessage(state: AudioRecorderState())))
+        viewModel.state.voiceMessageHasAudio = true
+        
+        let deferred = deferFulfillment(viewModel.actions) { action in
+            switch action {
+            case .voiceMessage(.send):
+                return true
+            default:
+                return false
+            }
+        }
+        viewModel.process(viewAction: .sendMessage)
+        try await deferred.fulfill()
+    }
+    
     // MARK: - Draft
     
     @Test

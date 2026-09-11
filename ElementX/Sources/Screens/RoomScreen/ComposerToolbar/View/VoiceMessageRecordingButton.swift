@@ -10,16 +10,16 @@ import Compound
 import SwiftUI
 
 enum VoiceMessageRecordingButtonMode {
-    case idle
-    case recording
+    case record
+    case resume
+    case pause
 }
 
 struct VoiceMessageRecordingButton: View {
     @Environment(\.isEnabled) private var isEnabled
     
     let mode: VoiceMessageRecordingButtonMode
-    var startRecording: (() -> Void)?
-    var stopRecording: (() -> Void)?
+    let action: () -> Void
     
     private let impactFeedbackGenerator = UIImpactFeedbackGenerator()
     
@@ -28,25 +28,28 @@ struct VoiceMessageRecordingButton: View {
         return Compound.supportsGlass ? .compound.iconPrimary : .compound.iconSecondary
     }
     
+    private var accessibilityLabel: String {
+        switch mode {
+        case .record: L10n.a11yVoiceMessageRecord
+        case .resume: UntranslatedL10n.a11yVoiceMessageResumeRecordingIos
+        case .pause: UntranslatedL10n.a11yVoiceMessagePauseRecordingIos
+        }
+    }
+    
     var body: some View {
         Button {
             impactFeedbackGenerator.impactOccurred()
-            switch mode {
-            case .idle:
-                startRecording?()
-            case .recording:
-                stopRecording?()
-            }
+            action()
         } label: {
             switch mode {
-            case .idle:
+            case .record, .resume:
                 CompoundIcon(Compound.supportsGlass ? \.micOnSolid : \.micOn,
                              size: .medium,
                              relativeTo: .compound.headingLG)
                     .foregroundColor(recordIconColour)
                     .scaledPadding(Compound.supportsGlass ? 10 : 6, relativeTo: .compound.headingLG)
-            case .recording:
-                CompoundIcon(\.stopSolid,
+            case .pause:
+                CompoundIcon(\.pauseSolid,
                              size: Compound.supportsGlass ? .medium : .small,
                              relativeTo: .compound.headingLG)
                     .foregroundColor(.compound.iconOnSolidPrimary)
@@ -56,7 +59,7 @@ struct VoiceMessageRecordingButton: View {
             }
         }
         .buttonStyle(VoiceMessageRecordingButtonStyle())
-        .accessibilityLabel(mode == .idle ? L10n.a11yVoiceMessageRecord : L10n.a11yVoiceMessageStopRecording)
+        .accessibilityLabel(accessibilityLabel)
     }
 }
 
@@ -84,10 +87,11 @@ private struct VoiceMessageRecordingButtonStyle: ButtonStyle {
 struct VoiceMessageRecordingButton_Previews: PreviewProvider, TestablePreview {
     static var previews: some View {
         HStack(spacing: 12) {
-            VoiceMessageRecordingButton(mode: .idle)
+            VoiceMessageRecordingButton(mode: .record) { }
                 .disabled(true)
-            VoiceMessageRecordingButton(mode: .idle)
-            VoiceMessageRecordingButton(mode: .recording)
+            VoiceMessageRecordingButton(mode: .record) { }
+            VoiceMessageRecordingButton(mode: .resume) { }
+            VoiceMessageRecordingButton(mode: .pause) { }
         }
     }
 }

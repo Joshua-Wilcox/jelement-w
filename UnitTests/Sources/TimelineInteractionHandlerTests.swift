@@ -183,6 +183,28 @@ struct TimelineInteractionHandlerTests {
         #expect(!voiceMessageRecorder.stopRecordingCalled)
     }
     
+    @Test
+    func resumingRecordsAnotherSegmentOfTheVoiceMessage() async {
+        let voiceMessageRecorder = makeVoiceMessageRecorder()
+        let handler = makeHandler(timelineItems: [Self.textMessage], voiceMessageRecorder: voiceMessageRecorder)
+        
+        await handler.resumeRecordingVoiceMessage()
+        
+        #expect(voiceMessageRecorder.resumeRecordingCallsCount == 1)
+    }
+    
+    @Test
+    func sendingWhilstRecordingStopsTheRecordingFirst() async {
+        let voiceMessageRecorder = makeVoiceMessageRecorder()
+        voiceMessageRecorder.isRecording = true
+        let handler = makeHandler(timelineItems: [Self.textMessage], voiceMessageRecorder: voiceMessageRecorder)
+        
+        await handler.sendCurrentVoiceMessage()
+        
+        #expect(voiceMessageRecorder.stopRecordingCallsCount == 1)
+        #expect(voiceMessageRecorder.sendVoiceMessageTimelineControllerAudioConverterCallsCount == 1)
+    }
+    
     // MARK: - Voice message transcription
     
     @Test
@@ -226,6 +248,19 @@ struct TimelineInteractionHandlerTests {
         for _ in 0..<10 {
             await Task.yield()
         }
+    }
+    
+    /// Builds a recorder that has recorded a voice message which is ready to be resumed or sent.
+    private func makeVoiceMessageRecorder() -> VoiceMessageRecorderMock {
+        let voiceMessageRecorder = VoiceMessageRecorderMock()
+        voiceMessageRecorder.isRecording = false
+        voiceMessageRecorder.actions = Empty().eraseToAnyPublisher()
+        voiceMessageRecorder.recordingURL = URL("file:///voice-message.m4a")
+        voiceMessageRecorder.previewAudioPlayerState = AudioPlayerState(id: .recorderPreview,
+                                                                        title: L10n.commonVoiceMessage,
+                                                                        duration: 10)
+        voiceMessageRecorder.sendVoiceMessageTimelineControllerAudioConverterReturnValue = .success(())
+        return voiceMessageRecorder
     }
     
     private func makeHandler(timelineItems: [RoomTimelineItemProtocol],

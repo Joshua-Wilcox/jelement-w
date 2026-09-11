@@ -58,6 +58,10 @@ class TimelineInteractionHandler {
         }
     }
     
+    /// The state of the voice message being recorded, which outlives each of its pauses.
+    private var voiceMessageRecorderState: AudioRecorderState?
+    private var isSendingVoiceMessage = false
+    
     private var resumeVoiceMessagePlaybackAfterScrubbing = false
     
     /// The voice message playback that was last asked for, and whether the player has begun it.
@@ -340,12 +344,16 @@ class TimelineInteractionHandler {
         MXLog.debug("handling voice recorder action: \(action) - (audio)")
         switch action {
         case .didStartRecording(let audioRecorder):
-            let audioRecordState = AudioRecorderState()
+            // The state is reused when resuming so that the waveform and duration carry on where they stopped.
+            let audioRecordState = voiceMessageRecorderState ?? AudioRecorderState()
+            voiceMessageRecorderState = audioRecordState
             audioRecordState.attachAudioRecorder(audioRecorder)
             actionsSubject.send(.composer(action: .setMode(mode: .recordVoiceMessage(state: audioRecordState))))
         case .didStopRecording(let previewAudioPlayerState, let url):
-            actionsSubject.send(.composer(action: .setMode(mode: .previewVoiceMessage(state: previewAudioPlayerState, waveform: .url(url), isUploading: false))))
             voiceMessageRecorderObserver = nil
+            // Showing the preview would only flash it up on screen before the upload begins.
+            guard !isSendingVoiceMessage else { return }
+            actionsSubject.send(.composer(action: .setMode(mode: .previewVoiceMessage(state: previewAudioPlayerState, waveform: .url(url), isUploading: false))))
         case .didFailWithError(let error):
             switch error {
             case .audioRecorderError(.recordPermissionNotGranted):
@@ -359,17 +367,28 @@ class TimelineInteractionHandler {
     }
     
     func startRecordingVoiceMessage() async {
+        await mediaPlayerProvider.detachAllStates(except: nil)
+        observeVoiceMessageRecorder()
+        await voiceMessageRecorder.startRecording()
+    }
+    
+    /// Pauses the recording, moving the composer to the preview state so that it can be played back.
+    func stopRecordingVoiceMessage() async {
+        await voiceMessageRecorder.stopRecording()
+    }
+    
+    func resumeRecordingVoiceMessage() async {
+        await mediaPlayerProvider.detachAllStates(except: nil)
+        observeVoiceMessageRecorder()
+        await voiceMessageRecorder.resumeRecording()
+    }
+    
+    private func observeVoiceMessageRecorder() {
         voiceMessageRecorderObserver = voiceMessageRecorder.actions
             .receive(on: DispatchQueue.main)
             .sink { [weak self] action in
                 self?.handleVoiceMessageRecorderAction(action)
             }
-        
-        await voiceMessageRecorder.startRecording()
-    }
-    
-    func stopRecordingVoiceMessage() async {
-        await voiceMessageRecorder.stopRecording()
     }
     
     /// Stops the recording when one is in progress, moving the composer to the preview state.
@@ -381,6 +400,7 @@ class TimelineInteractionHandler {
     func cancelRecordingVoiceMessage() async {
         await voiceMessageRecorder.cancelRecording()
         voiceMessageRecorderObserver = nil
+        voiceMessageRecorderState = nil
         actionsSubject.send(.composer(action: .setMode(mode: .default)))
     }
     
@@ -392,10 +412,17 @@ class TimelineInteractionHandler {
         }
         
         voiceMessageRecorderObserver = nil
+        voiceMessageRecorderState = nil
         actionsSubject.send(.composer(action: .setMode(mode: .default)))
     }
     
     func sendCurrentVoiceMessage() async {
+        isSendingVoiceMessage = true
+        defer { isSendingVoiceMessage = false }
+        
+        // The message can be sent whilst it is still being recorded.
+        await stopRecordingVoiceMessageIfNeeded()
+        
         guard let audioPlayerState = voiceMessageRecorder.previewAudioPlayerState, let recordingURL = voiceMessageRecorder.recordingURL else {
             actionsSubject.send(.displayErrorToast(L10n.errorFailedUploadingVoiceMessage))
             return

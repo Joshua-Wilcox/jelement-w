@@ -23,6 +23,7 @@ struct VoiceMessageRecorderTests {
     
     private var mediaPlayerProvider: MediaPlayerProviderMock!
     private var audioConverter: AudioConverterMock!
+    private var audioSegmentMerger: AudioSegmentMergerMock!
     private var voiceMessageCache: VoiceMessageCacheMock!
     
     private var audioPlayer: AudioPlayerMock!
@@ -46,39 +47,44 @@ struct VoiceMessageRecorderTests {
         mediaPlayerProvider = MediaPlayerProviderMock()
         mediaPlayerProvider.player = audioPlayer
         audioConverter = AudioConverterMock()
+        audioSegmentMerger = AudioSegmentMergerMock()
         voiceMessageCache = VoiceMessageCacheMock()
         voiceMessageCache.urlForRecording = FileManager.default.temporaryDirectory.appendingPathComponent("test-voice-message").appendingPathExtension("m4a")
         
         voiceMessageRecorder = VoiceMessageRecorder(audioRecorder: audioRecorder,
                                                     mediaPlayerProvider: mediaPlayerProvider,
-                                                    voiceMessageCache: voiceMessageCache)
+                                                    voiceMessageCache: voiceMessageCache,
+                                                    audioSegmentMerger: audioSegmentMerger)
     }
     
-    private func setRecordingComplete() async throws {
-        audioRecorder.audioFileURL = recordingURL
-        audioRecorder.currentTime = 5
+    /// Records a voice message and stops it, leaving it ready to be played back, resumed or sent.
+    private func setRecordingComplete(fileURL: URL? = nil, duration: TimeInterval = 5) async {
+        audioRecorder.audioFileURL = fileURL ?? recordingURL
+        audioRecorder.currentTime = duration
         
-        let deferred = deferFulfillment(voiceMessageRecorder.actions) { action in
-            switch action {
-            case .didStopRecording(_, let url) where url == recordingURL:
-                return true
-            default:
-                return false
-            }
-        }
-        audioRecorderActionsSubject.send(.didStopRecording)
-        try await deferred.fulfill()
+        await voiceMessageRecorder.startRecording()
+        await voiceMessageRecorder.stopRecording()
+    }
+    
+    /// Resumes a stopped recording, appending another segment to it before stopping it again.
+    private func setResumedRecordingComplete(fileURL: URL, duration: TimeInterval) async {
+        await voiceMessageRecorder.resumeRecording()
+        
+        audioRecorder.audioFileURL = fileURL
+        audioRecorder.currentTime = duration
+        
+        await voiceMessageRecorder.stopRecording()
     }
     
     @Test
-    func recorderRecordingURL() {
-        audioRecorder.audioFileURL = recordingURL
+    func recorderRecordingURL() async {
+        await setRecordingComplete()
         #expect(voiceMessageRecorder.recordingURL == recordingURL)
     }
     
     @Test
-    func recorderRecordingDuration() {
-        audioRecorder.currentTime = 10.3
+    func recorderRecordingDuration() async {
+        await setRecordingComplete(duration: 10.3)
         #expect(voiceMessageRecorder.recordingDuration == 10.3)
     }
     
@@ -96,19 +102,89 @@ struct VoiceMessageRecorderTests {
     }
     
     @Test
+    func resumeRecording() async {
+        await setRecordingComplete()
+        
+        await voiceMessageRecorder.resumeRecording()
+        
+        // A new segment must be recorded so that the first one isn't overwritten
+        let segmentURLs = audioRecorder.recordAudioFileURLReceivedInvocations
+        #expect(segmentURLs.count == 2)
+        #expect(segmentURLs.first != segmentURLs.last)
+    }
+    
+    @Test
+    func stopRecordingMergesTheSegmentsOfAResumedRecording() async {
+        await setRecordingComplete()
+        
+        let secondSegmentURL = URL("/some/other/url")
+        await setResumedRecordingComplete(fileURL: secondSegmentURL, duration: 3)
+        
+        #expect(audioSegmentMerger.mergeIntoCallsCount == 1)
+        #expect(audioSegmentMerger.mergeIntoReceivedArguments?.segmentURLs == [recordingURL, secondSegmentURL])
+        #expect(audioSegmentMerger.mergeIntoReceivedArguments?.destinationURL == voiceMessageCache.urlForRecording)
+        // The whole recording must be sent, not just its last segment
+        #expect(voiceMessageRecorder.recordingURL == voiceMessageCache.urlForRecording)
+        #expect(voiceMessageRecorder.recordingDuration == 8)
+        #expect(voiceMessageRecorder.previewAudioPlayerState?.duration == 8)
+    }
+    
+    @Test
+    func stopRecordingFailsWhenTheSegmentsCantBeMerged() async throws {
+        await setRecordingComplete()
+        audioSegmentMerger.mergeIntoThrowableError = AudioSegmentMergerError.mergeFailed(nil)
+        
+        let deferred = deferFulfillment(voiceMessageRecorder.actions) { action in
+            switch action {
+            case .didFailWithError(.failedMergingSegments):
+                return true
+            default:
+                return false
+            }
+        }
+        await setResumedRecordingComplete(fileURL: URL("/some/other/url"), duration: 3)
+        try await deferred.fulfill()
+    }
+    
+    @Test
     func cancelRecording() async {
+        await setRecordingComplete()
+        
         await voiceMessageRecorder.cancelRecording()
+        
         // Internal audio recorder must have been stopped
         #expect(audioRecorder.stopRecordingCalled)
         // The recording audio file must have been deleted
         #expect(audioRecorder.deleteRecordingCalled)
+        #expect(voiceMessageRecorder.recordingURL == nil)
+        #expect(voiceMessageRecorder.recordingDuration == 0)
     }
     
     @Test
     func deleteRecording() async {
+        await setRecordingComplete()
+        
         await voiceMessageRecorder.deleteRecording()
+        
         // The recording audio file must have been deleted
         #expect(audioRecorder.deleteRecordingCalled)
+        #expect(voiceMessageRecorder.recordingURL == nil)
+        #expect(voiceMessageRecorder.recordingDuration == 0)
+        #expect(voiceMessageRecorder.previewAudioPlayerState == nil)
+    }
+    
+    @Test
+    func deleteRecordingRemovesTheMergedFile() async throws {
+        await setRecordingComplete()
+        await setResumedRecordingComplete(fileURL: URL("/some/other/url"), duration: 3)
+        
+        // The merger is mocked, so the file it would have written needs creating by hand.
+        let mergedURL = voiceMessageCache.urlForRecording
+        try Data().write(to: mergedURL)
+        
+        await voiceMessageRecorder.deleteRecording()
+        
+        #expect(!FileManager.default.fileExists(atPath: mergedURL.path()))
     }
     
     @Test
@@ -120,8 +196,8 @@ struct VoiceMessageRecorderTests {
     }
     
     @Test
-    func startPlayback() async throws {
-        try await setRecordingComplete()
+    func startPlayback() async {
+        await setRecordingComplete()
         
         guard case .success = await voiceMessageRecorder.startPlayback() else {
             Issue.record("Playback should start")
@@ -136,8 +212,8 @@ struct VoiceMessageRecorderTests {
     }
     
     @Test
-    func pausePlayback() async throws {
-        try await setRecordingComplete()
+    func pausePlayback() async {
+        await setRecordingComplete()
         
         _ = await voiceMessageRecorder.startPlayback()
         #expect(voiceMessageRecorder.previewAudioPlayerState?.isAttached == true)
@@ -147,8 +223,8 @@ struct VoiceMessageRecorderTests {
     }
     
     @Test
-    func resumePlayback() async throws {
-        try await setRecordingComplete()
+    func resumePlayback() async {
+        await setRecordingComplete()
         audioPlayer.playbackURL = recordingURL
         
         guard case .success = await voiceMessageRecorder.startPlayback() else {
@@ -162,8 +238,8 @@ struct VoiceMessageRecorderTests {
     }
     
     @Test
-    func stopPlayback() async throws {
-        try await setRecordingComplete()
+    func stopPlayback() async {
+        await setRecordingComplete()
         
         _ = await voiceMessageRecorder.startPlayback()
         #expect(voiceMessageRecorder.previewAudioPlayerState?.isAttached == true)
@@ -174,8 +250,8 @@ struct VoiceMessageRecorderTests {
     }
     
     @Test
-    func seekPlayback() async throws {
-        try await setRecordingComplete()
+    func seekPlayback() async {
+        await setRecordingComplete()
         
         _ = await voiceMessageRecorder.startPlayback()
         #expect(voiceMessageRecorder.previewAudioPlayerState?.isAttached == true)
@@ -194,7 +270,7 @@ struct VoiceMessageRecorderTests {
         }
         
         let audioFileURL = try #require(Bundle(for: UnitTestsAppCoordinator.self).url(forResource: "test_audio", withExtension: "mp3"), "Test audio file is missing")
-        audioRecorder.audioFileURL = audioFileURL
+        await setRecordingComplete(fileURL: audioFileURL)
         guard case .success(let data) = await voiceMessageRecorder.buildRecordingWaveform() else {
             Issue.record("A waveform is expected")
             return
@@ -217,7 +293,7 @@ struct VoiceMessageRecorderTests {
     
     @Test
     func sendVoiceMessage_ConversionError() async {
-        audioRecorder.audioFileURL = recordingURL
+        await setRecordingComplete()
         // If the converter returns an error
         audioConverter.convertToOpusOggSourceURLDestinationURLThrowableError = AudioConverterError.conversionFailed(nil)
         
@@ -232,7 +308,7 @@ struct VoiceMessageRecorderTests {
     @Test
     func sendVoiceMessage_InvalidFile() async throws {
         let audioFileURL = try #require(Bundle(for: UnitTestsAppCoordinator.self).url(forResource: "test_voice_message", withExtension: "m4a"), "Test audio file is missing")
-        audioRecorder.audioFileURL = audioFileURL
+        await setRecordingComplete(fileURL: audioFileURL)
         audioConverter.convertToOpusOggSourceURLDestinationURLClosure = { _, destination in
             try? FileManager.default.removeItem(at: destination)
         }
@@ -250,7 +326,7 @@ struct VoiceMessageRecorderTests {
     @Test
     func sendVoiceMessage_WaveformAnlyseFailed() async throws {
         let imageFileURL = try #require(Bundle(for: UnitTestsAppCoordinator.self).url(forResource: "test_image", withExtension: "png"), "Test image file is missing")
-        audioRecorder.audioFileURL = imageFileURL
+        await setRecordingComplete(fileURL: imageFileURL)
         audioConverter.convertToOpusOggSourceURLDestinationURLClosure = { _, destination in
             try? FileManager.default.removeItem(at: destination)
             try? FileManager.default.copyItem(at: imageFileURL, to: destination)
@@ -269,7 +345,7 @@ struct VoiceMessageRecorderTests {
     @Test
     func sendVoiceMessage_SendError() async throws {
         let audioFileURL = try #require(Bundle(for: UnitTestsAppCoordinator.self).url(forResource: "test_voice_message", withExtension: "m4a"), "Test audio file is missing")
-        audioRecorder.audioFileURL = audioFileURL
+        await setRecordingComplete(fileURL: audioFileURL)
         audioConverter.convertToOpusOggSourceURLDestinationURLClosure = { source, destination in
             try? FileManager.default.removeItem(at: destination)
             let internalConverter = AudioConverter()
@@ -357,6 +433,7 @@ struct VoiceMessageRecorderTests {
     func audioRecorderActionHandling_didStopRecording() async throws {
         audioRecorder.audioFileURL = recordingURL
         audioRecorder.currentTime = 5
+        await voiceMessageRecorder.startRecording()
         
         let deferred = deferFulfillment(voiceMessageRecorder.actions) { action in
             switch action {

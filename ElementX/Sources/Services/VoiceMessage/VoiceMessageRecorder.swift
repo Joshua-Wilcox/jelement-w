@@ -15,6 +15,7 @@ class VoiceMessageRecorder: VoiceMessageRecorderProtocol {
     let audioRecorder: AudioRecorderProtocol
     private let voiceMessageCache: VoiceMessageCacheProtocol
     private let mediaPlayerProvider: MediaPlayerProviderProtocol
+    private let audioSegmentMerger: AudioSegmentMergerProtocol
     
     private let actionsSubject: PassthroughSubject<VoiceMessageRecorderAction, Never> = .init()
     var actions: AnyPublisher<VoiceMessageRecorderAction, Never> {
@@ -25,15 +26,26 @@ class VoiceMessageRecorder: VoiceMessageRecorderProtocol {
         audioRecorder.isRecording
     }
     
+    /// The file containing everything recorded up to the last time the recording was stopped,
+    /// which is the merged one when the recording was paused and resumed.
     var recordingURL: URL? {
-        audioRecorder.audioFileURL
+        recordedSegmentURLs.count > 1 ? mergedRecordingURL : recordedSegmentURLs.first
     }
     
+    /// The duration of the whole recording, including the segments recorded before any pauses.
     var recordingDuration: TimeInterval {
-        audioRecorder.currentTime
+        completedSegmentsDuration + (currentSegmentURL != nil ? audioRecorder.currentTime : 0)
     }
     
     private var recordingCancelled = false
+    
+    /// The segments that have been recorded, in the order they were spoken.
+    private var recordedSegmentURLs: [URL] = []
+    /// The segment being recorded, which is only set whilst recording.
+    private var currentSegmentURL: URL?
+    private var completedSegmentsDuration: TimeInterval = 0
+    private var mergedRecordingURL: URL?
+    private var finalizeRecordingTask: Task<Void, Never>?
     
     private(set) var previewAudioPlayerState: AudioPlayerState?
     private(set) var previewAudioPlayer: AudioPlayerProtocol?
@@ -41,10 +53,12 @@ class VoiceMessageRecorder: VoiceMessageRecorderProtocol {
     
     init(audioRecorder: AudioRecorderProtocol = AudioRecorder(),
          mediaPlayerProvider: MediaPlayerProviderProtocol,
-         voiceMessageCache: VoiceMessageCacheProtocol = VoiceMessageCache()) {
+         voiceMessageCache: VoiceMessageCacheProtocol = VoiceMessageCache(),
+         audioSegmentMerger: AudioSegmentMergerProtocol = AudioSegmentMerger()) {
         self.audioRecorder = audioRecorder
         self.mediaPlayerProvider = mediaPlayerProvider
         self.voiceMessageCache = voiceMessageCache
+        self.audioSegmentMerger = audioSegmentMerger
         
         addObservers()
     }
@@ -58,14 +72,28 @@ class VoiceMessageRecorder: VoiceMessageRecorderProtocol {
     func startRecording() async {
         await stopPlayback()
         previewAudioPlayer?.reset()
+        previewAudioPlayerState = nil
+        deleteRecordedSegments()
         recordingCancelled = false
         
-        await audioRecorder.record(audioFileURL: voiceMessageCache.urlForRecording)
+        await recordNewSegment()
     }
     
     func stopRecording() async {
         recordingCancelled = false
         await audioRecorder.stopRecording()
+        
+        finalizeRecording()
+        // The preview needs to be ready when this returns so that the recording can be sent right away.
+        await finalizeRecordingTask?.value
+    }
+    
+    func resumeRecording() async {
+        await stopPlayback()
+        previewAudioPlayer?.reset()
+        recordingCancelled = false
+        
+        await recordNewSegment()
     }
     
     func cancelRecording() async {
@@ -73,6 +101,7 @@ class VoiceMessageRecorder: VoiceMessageRecorderProtocol {
         recordingCancelled = true
         await audioRecorder.stopRecording()
         await audioRecorder.deleteRecording()
+        deleteRecordedSegments()
         previewAudioPlayerState = nil
         previewAudioPlayer?.reset()
     }
@@ -81,6 +110,7 @@ class VoiceMessageRecorder: VoiceMessageRecorderProtocol {
         MXLog.info("Delete recording.")
         await stopPlayback()
         await audioRecorder.deleteRecording()
+        deleteRecordedSegments()
         previewAudioPlayer?.reset()
         previewAudioPlayerState = nil
     }
@@ -88,7 +118,7 @@ class VoiceMessageRecorder: VoiceMessageRecorderProtocol {
     // MARK: - Preview
     
     func startPlayback() async -> Result<Void, VoiceMessageRecorderError> {
-        guard let previewAudioPlayerState, let url = audioRecorder.audioFileURL else {
+        guard let previewAudioPlayerState, let url = recordingURL else {
             return .failure(.previewNotAvailable)
         }
         
@@ -126,7 +156,7 @@ class VoiceMessageRecorder: VoiceMessageRecorderProtocol {
     }
     
     func buildRecordingWaveform() async -> Result<[Float], VoiceMessageRecorderError> {
-        guard let url = audioRecorder.audioFileURL else {
+        guard let url = recordingURL else {
             return .failure(.missingRecordingFile)
         }
         // build the waveform
@@ -145,7 +175,7 @@ class VoiceMessageRecorder: VoiceMessageRecorderProtocol {
     
     func sendVoiceMessage(timelineController: TimelineControllerProtocol,
                           audioConverter: AudioConverterProtocol) async -> Result<Void, VoiceMessageRecorderError> {
-        guard let url = audioRecorder.audioFileURL else {
+        guard let url = recordingURL else {
             return .failure(VoiceMessageRecorderError.missingRecordingFile)
         }
         
@@ -190,6 +220,34 @@ class VoiceMessageRecorder: VoiceMessageRecorderProtocol {
     
     // MARK: - Private
     
+    private func recordNewSegment() async {
+        finalizeRecordingTask = nil
+        
+        let segmentURL = segmentURL(at: recordedSegmentURLs.count)
+        currentSegmentURL = segmentURL
+        await audioRecorder.record(audioFileURL: segmentURL)
+    }
+    
+    /// The file to record a segment into, which must differ from the merged recording's own file.
+    private func segmentURL(at index: Int) -> URL {
+        let baseURL = voiceMessageCache.urlForRecording
+        return baseURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("\(baseURL.deletingPathExtension().lastPathComponent)-\(index)")
+            .appendingPathExtension(baseURL.pathExtension)
+    }
+    
+    private func deleteRecordedSegments() {
+        for url in recordedSegmentURLs + [currentSegmentURL, mergedRecordingURL].compactMap({ $0 }) {
+            try? FileManager.default.removeItem(at: url)
+        }
+        
+        recordedSegmentURLs = []
+        currentSegmentURL = nil
+        mergedRecordingURL = nil
+        completedSegmentsDuration = 0
+    }
+    
     private func addObservers() {
         audioRecorder.actions
             .receive(on: DispatchQueue.main)
@@ -211,39 +269,60 @@ class VoiceMessageRecorder: VoiceMessageRecorderProtocol {
             actionsSubject.send(.didStartRecording(audioRecorder: audioRecorder))
         case .didStopRecording, .didFailWithError(error: .interrupted):
             MXLog.info("audio recorder did stop recording")
-            if !recordingCancelled {
-                Task {
-                    guard case .success = await finalizeRecording() else {
-                        actionsSubject.send(.didFailWithError(error: VoiceMessageRecorderError.previewNotAvailable))
-                        return
-                    }
-                    guard let recordingURL = audioRecorder.audioFileURL, let previewAudioPlayerState else {
-                        actionsSubject.send(.didFailWithError(error: VoiceMessageRecorderError.previewNotAvailable))
-                        return
-                    }
-                    mediaPlayerProvider.register(audioPlayerState: previewAudioPlayerState)
-                    actionsSubject.send(.didStopRecording(previewState: previewAudioPlayerState, url: recordingURL))
-                }
-            }
+            finalizeRecording()
         case .didFailWithError(let error):
             MXLog.info("audio recorder did failed with error: \(error)")
             actionsSubject.send(.didFailWithError(error: .audioRecorderError(error)))
         }
     }
     
-    private func finalizeRecording() async -> Result<Void, VoiceMessageRecorderError> {
+    /// Closes the segment that has just been recorded and prepares a preview of the whole recording.
+    ///
+    /// The recording can be stopped by the recorder itself as well as by the user, so this may be
+    /// called twice for the same segment, doing nothing the second time around.
+    private func finalizeRecording() {
+        guard !recordingCancelled, currentSegmentURL != nil else { return }
+        currentSegmentURL = nil
+        
+        if let segmentURL = audioRecorder.audioFileURL, audioRecorder.currentTime > 0 {
+            recordedSegmentURLs.append(segmentURL)
+            completedSegmentsDuration += audioRecorder.currentTime
+        }
+        
+        finalizeRecordingTask = Task {
+            switch await makeRecordingPreview() {
+            case .success(let preview):
+                mediaPlayerProvider.register(audioPlayerState: preview.state)
+                actionsSubject.send(.didStopRecording(previewState: preview.state, url: preview.url))
+            case .failure(let error):
+                actionsSubject.send(.didFailWithError(error: error))
+            }
+        }
+    }
+    
+    private func makeRecordingPreview() async -> Result<(state: AudioPlayerState, url: URL), VoiceMessageRecorderError> {
         MXLog.info("finalize audio recording")
-        guard audioRecorder.audioFileURL != nil, audioRecorder.currentTime > 0 else {
+        
+        // The segments are only merged when the recording was paused, to avoid re-encoding it needlessly.
+        if recordedSegmentURLs.count > 1 {
+            let mergedURL = voiceMessageCache.urlForRecording
+            do {
+                try await audioSegmentMerger.merge(recordedSegmentURLs, into: mergedURL)
+            } catch {
+                MXLog.error("Failed merging the recorded segments. \(error)")
+                return .failure(.failedMergingSegments)
+            }
+            mergedRecordingURL = mergedURL
+        }
+        
+        guard let url = recordingURL, recordingDuration > 0 else {
             return .failure(.previewNotAvailable)
         }
         
-        // Build the preview audio player state
-        previewAudioPlayerState = AudioPlayerState(id: .recorderPreview, title: L10n.commonVoiceMessage, duration: recordingDuration, waveform: EstimatedWaveform(data: []))
+        let state = AudioPlayerState(id: .recorderPreview, title: L10n.commonVoiceMessage, duration: recordingDuration, waveform: EstimatedWaveform(data: []))
+        previewAudioPlayerState = state
+        previewAudioPlayer = mediaPlayerProvider.player
         
-        // Build the preview audio player
-        let audioPlayer = mediaPlayerProvider.player
-        previewAudioPlayer = audioPlayer
-        
-        return .success(())
+        return .success((state, url))
     }
 }
