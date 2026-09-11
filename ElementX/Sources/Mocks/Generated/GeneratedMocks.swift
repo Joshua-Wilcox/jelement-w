@@ -14309,6 +14309,7 @@ nonisolated class UserSessionMock: UserSessionProtocol, @unchecked Sendable {
         set(value) { underlyingVoiceMessageMediaManager = value }
     }
     nonisolated(unsafe) var underlyingVoiceMessageMediaManager: VoiceMessageMediaManagerProtocol!
+    nonisolated(unsafe) var voiceMessageTranscriptionService: VoiceMessageTranscriptionServiceProtocol?
     var liveLocationManager: LiveLocationManagerProtocol {
         get { return underlyingLiveLocationManager }
         set(value) { underlyingLiveLocationManager = value }
@@ -14833,6 +14834,82 @@ nonisolated class VoiceMessageRecorderMock: VoiceMessageRecorderProtocol, @unche
         } else {
             return sendVoiceMessageTimelineControllerAudioConverterReturnValue
         }
+    }
+}
+nonisolated class VoiceMessageTranscriptionServiceMock: VoiceMessageTranscriptionServiceProtocol, @unchecked Sendable {
+
+    //MARK: - transcriptionState
+
+    private let transcriptionStateForCallsCountLock = NSLock()
+    private nonisolated(unsafe) var transcriptionStateForUnderlyingCallsCount = 0
+    var transcriptionStateForCallsCount: Int {
+        get { transcriptionStateForCallsCountLock.withLock { transcriptionStateForUnderlyingCallsCount } }
+        set { transcriptionStateForCallsCountLock.withLock { transcriptionStateForUnderlyingCallsCount = newValue } }
+    }
+    var transcriptionStateForCalled: Bool {
+        return transcriptionStateForCallsCount > 0
+    }
+    private let transcriptionStateForReceivedSourceLock = NSLock()
+    private nonisolated(unsafe) var transcriptionStateForUnderlyingReceivedSource: MediaSourceProxy?
+    var transcriptionStateForReceivedSource: MediaSourceProxy? {
+        get { transcriptionStateForReceivedSourceLock.withLock { transcriptionStateForUnderlyingReceivedSource } }
+        set { transcriptionStateForReceivedSourceLock.withLock { transcriptionStateForUnderlyingReceivedSource = newValue } }
+    }
+    private let transcriptionStateForReceivedInvocationsLock = NSLock()
+    private nonisolated(unsafe) var transcriptionStateForUnderlyingReceivedInvocations: [MediaSourceProxy] = []
+    var transcriptionStateForReceivedInvocations: [MediaSourceProxy] {
+        get { transcriptionStateForReceivedInvocationsLock.withLock { transcriptionStateForUnderlyingReceivedInvocations } }
+        set { transcriptionStateForReceivedInvocationsLock.withLock { transcriptionStateForUnderlyingReceivedInvocations = newValue } }
+    }
+
+    private let transcriptionStateForReturnValueLock = NSLock()
+    private nonisolated(unsafe) var transcriptionStateForUnderlyingReturnValue: VoiceMessageTranscriptionState!
+    var transcriptionStateForReturnValue: VoiceMessageTranscriptionState! {
+        get { transcriptionStateForReturnValueLock.withLock { transcriptionStateForUnderlyingReturnValue } }
+        set { transcriptionStateForReturnValueLock.withLock { transcriptionStateForUnderlyingReturnValue = newValue } }
+    }
+    nonisolated(unsafe) var transcriptionStateForClosure: ((MediaSourceProxy) -> VoiceMessageTranscriptionState)?
+
+    func transcriptionState(for source: MediaSourceProxy) -> VoiceMessageTranscriptionState {
+        transcriptionStateForCallsCountLock.withLock { transcriptionStateForUnderlyingCallsCount += 1 }
+        transcriptionStateForReceivedSource = source
+        transcriptionStateForReceivedInvocationsLock.withLock { transcriptionStateForUnderlyingReceivedInvocations.append(source) }
+        if let transcriptionStateForClosure = transcriptionStateForClosure {
+            return transcriptionStateForClosure(source)
+        } else {
+            return transcriptionStateForReturnValue
+        }
+    }
+    //MARK: - transcribeVoiceMessage
+
+    private let transcribeVoiceMessageFromCallsCountLock = NSLock()
+    private nonisolated(unsafe) var transcribeVoiceMessageFromUnderlyingCallsCount = 0
+    var transcribeVoiceMessageFromCallsCount: Int {
+        get { transcribeVoiceMessageFromCallsCountLock.withLock { transcribeVoiceMessageFromUnderlyingCallsCount } }
+        set { transcribeVoiceMessageFromCallsCountLock.withLock { transcribeVoiceMessageFromUnderlyingCallsCount = newValue } }
+    }
+    var transcribeVoiceMessageFromCalled: Bool {
+        return transcribeVoiceMessageFromCallsCount > 0
+    }
+    private let transcribeVoiceMessageFromReceivedSourceLock = NSLock()
+    private nonisolated(unsafe) var transcribeVoiceMessageFromUnderlyingReceivedSource: MediaSourceProxy?
+    var transcribeVoiceMessageFromReceivedSource: MediaSourceProxy? {
+        get { transcribeVoiceMessageFromReceivedSourceLock.withLock { transcribeVoiceMessageFromUnderlyingReceivedSource } }
+        set { transcribeVoiceMessageFromReceivedSourceLock.withLock { transcribeVoiceMessageFromUnderlyingReceivedSource = newValue } }
+    }
+    private let transcribeVoiceMessageFromReceivedInvocationsLock = NSLock()
+    private nonisolated(unsafe) var transcribeVoiceMessageFromUnderlyingReceivedInvocations: [MediaSourceProxy] = []
+    var transcribeVoiceMessageFromReceivedInvocations: [MediaSourceProxy] {
+        get { transcribeVoiceMessageFromReceivedInvocationsLock.withLock { transcribeVoiceMessageFromUnderlyingReceivedInvocations } }
+        set { transcribeVoiceMessageFromReceivedInvocationsLock.withLock { transcribeVoiceMessageFromUnderlyingReceivedInvocations = newValue } }
+    }
+    nonisolated(unsafe) var transcribeVoiceMessageFromClosure: ((MediaSourceProxy) async -> Void)?
+
+    @concurrent func transcribeVoiceMessage(from source: MediaSourceProxy) async {
+        transcribeVoiceMessageFromCallsCountLock.withLock { transcribeVoiceMessageFromUnderlyingCallsCount += 1 }
+        transcribeVoiceMessageFromReceivedSource = source
+        transcribeVoiceMessageFromReceivedInvocationsLock.withLock { transcribeVoiceMessageFromUnderlyingReceivedInvocations.append(source) }
+        await transcribeVoiceMessageFromClosure?(source)
     }
 }
 nonisolated class WindowManagerMock: WindowManagerProtocol, @unchecked Sendable {

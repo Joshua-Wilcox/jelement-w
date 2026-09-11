@@ -18,6 +18,8 @@ class UserSession: UserSessionProtocol {
     let mediaProvider: MediaProviderProtocol
     
     let voiceMessageMediaManager: VoiceMessageMediaManagerProtocol
+    /// Transcribes voice messages on device, `nil` when the OS doesn't support it.
+    let voiceMessageTranscriptionService: VoiceMessageTranscriptionServiceProtocol?
     let liveLocationManager: LiveLocationManagerProtocol
     
     /// Scans media content, `nil` when no content scanner is configured for the server.
@@ -30,10 +32,15 @@ class UserSession: UserSessionProtocol {
         sessionSecurityStateSubject.asCurrentValuePublisher()
     }
     
-    init(clientProxy: ClientProxyProtocol, mediaProvider: MediaProviderProtocol, voiceMessageMediaManager: VoiceMessageMediaManagerProtocol, liveLocationManager: LiveLocationManagerProtocol) {
+    init(clientProxy: ClientProxyProtocol,
+         mediaProvider: MediaProviderProtocol,
+         voiceMessageMediaManager: VoiceMessageMediaManagerProtocol,
+         voiceMessageTranscriptionService: VoiceMessageTranscriptionServiceProtocol?,
+         liveLocationManager: LiveLocationManagerProtocol) {
         self.clientProxy = clientProxy
         self.mediaProvider = mediaProvider
         self.voiceMessageMediaManager = voiceMessageMediaManager
+        self.voiceMessageTranscriptionService = voiceMessageTranscriptionService
         self.liveLocationManager = liveLocationManager
         contentScannerService = clientProxy.contentScanner.map(ContentScannerService.init)
         

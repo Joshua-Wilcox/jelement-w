@@ -113,6 +113,12 @@ class UserSessionStore: UserSessionStoreProtocol {
         
         let voiceMessageMediaManager = VoiceMessageMediaManager(mediaProvider: mediaProvider)
         
+        var voiceMessageTranscriptionService: VoiceMessageTranscriptionServiceProtocol?
+        if #available(iOS 26.0, *) {
+            voiceMessageTranscriptionService = VoiceMessageTranscriptionService(voiceMessageMediaManager: voiceMessageMediaManager,
+                                                                                audioFileTranscriber: AudioFileTranscriber())
+        }
+        
         let liveLocationManager = await MainActor.run {
             LiveLocationManager(clientProxy: clientProxy,
                                 appSettings: appSettings)
@@ -121,6 +127,7 @@ class UserSessionStore: UserSessionStoreProtocol {
         return UserSession(clientProxy: clientProxy,
                            mediaProvider: mediaProvider,
                            voiceMessageMediaManager: voiceMessageMediaManager,
+                           voiceMessageTranscriptionService: voiceMessageTranscriptionService,
                            liveLocationManager: liveLocationManager)
     }
     

@@ -11,6 +11,7 @@ import Foundation
 
 struct UserSessionMockConfiguration {
     var clientProxy: ClientProxyProtocol = ClientProxyMock(.init())
+    var voiceMessageTranscriptionService: VoiceMessageTranscriptionServiceProtocol?
     var contentScannerService: ContentScannerServiceProtocol?
 }
 
@@ -21,6 +22,7 @@ struct UserSessionMockConfiguration {
         clientProxy = configuration.clientProxy
         mediaProvider = MediaProviderMock(.init())
         voiceMessageMediaManager = VoiceMessageMediaManagerMock()
+        voiceMessageTranscriptionService = configuration.voiceMessageTranscriptionService
         contentScannerService = configuration.contentScannerService
         
         sessionSecurityStatePublisher = CurrentValueSubject<SessionSecurityState, Never>(.init(verificationState: .verified, recoveryState: .enabled)).asCurrentValuePublisher()
