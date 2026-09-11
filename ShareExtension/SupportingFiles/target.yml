@@ -64,11 +64,7 @@ targets:
 
     entitlements:
       path: ShareExtension.entitlements
-      properties:
-        com.apple.security.application-groups:
-        - $(APP_GROUP_IDENTIFIER)
-        keychain-access-groups:
-        - $(KEYCHAIN_ACCESS_GROUP_IDENTIFIER)
+      properties: {}
 
     settings:
       base:
