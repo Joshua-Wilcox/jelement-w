@@ -23,6 +23,8 @@ protocol UserSessionProtocol: Sendable {
     var clientProxy: ClientProxyProtocol { get }
     var mediaProvider: MediaProviderProtocol { get }
     var voiceMessageMediaManager: VoiceMessageMediaManagerProtocol { get }
+    /// Transcribes voice messages on device, `nil` when the OS doesn't support it.
+    var voiceMessageTranscriptionService: VoiceMessageTranscriptionServiceProtocol? { get }
     var liveLocationManager: LiveLocationManagerProtocol { get }
     
     /// Scans media content, `nil` when no content scanner is configured for the server.

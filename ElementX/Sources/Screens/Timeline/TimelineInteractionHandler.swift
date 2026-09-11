@@ -548,6 +548,28 @@ class TimelineInteractionHandler {
         }
     }
     
+    // MARK: Voice Message Transcription
+    
+    func transcribeVoiceMessage(for itemID: TimelineItemIdentifier) async {
+        guard let voiceMessageRoomTimelineItem = timelineController.timelineItems.firstUsingStableID(itemID) as? VoiceMessageRoomTimelineItem else {
+            MXLog.error("Cannot transcribe, no voice message found for itemID \(itemID)")
+            return
+        }
+        
+        guard let source = voiceMessageRoomTimelineItem.content.source else {
+            MXLog.error("Cannot transcribe the voice message, source is not defined for itemID \(itemID)")
+            return
+        }
+        
+        guard let voiceMessageTranscriptionService = userSession.voiceMessageTranscriptionService else {
+            MXLog.error("Cannot transcribe the voice message, transcription isn't available for itemID \(itemID)")
+            return
+        }
+        
+        MXLog.info("Transcribing the voice message for itemID \(itemID)")
+        await voiceMessageTranscriptionService.transcribeVoiceMessage(from: source)
+    }
+    
     /// Plays the voice message directly following the given one.
     private func autoplayVoiceMessage(following finishedItemID: TimelineItemIdentifier) async {
         // The playback may have been taken over by another player state, such as the recorder's preview.

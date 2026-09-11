@@ -163,9 +163,11 @@ struct MediaEventsTimelineScreen: View {
         case .audio(let timelineItem) where screenMode == .files:
             AudioMediaEventsTimelineView(timelineItem: timelineItem)
         case .voice(let timelineItem) where screenMode == .files:
+            let activeTimelineViewState = context.viewState.activeTimelineContext.viewState
             let defaultPlayerState = AudioPlayerState(id: .timelineItemIdentifier(timelineItem.id), title: L10n.commonVoiceMessage, duration: 0)
-            let playerState = context.viewState.activeTimelineContext.viewState.audioPlayerStateProvider?(timelineItem.id) ?? defaultPlayerState
-            VoiceMessageMediaEventsTimelineView(timelineItem: timelineItem, playerState: playerState)
+            let playerState = activeTimelineViewState.audioPlayerStateProvider?(timelineItem.id) ?? defaultPlayerState
+            let transcriptionState = timelineItem.content.source.flatMap { activeTimelineViewState.voiceMessageTranscriptionStateProvider?($0) }
+            VoiceMessageMediaEventsTimelineView(timelineItem: timelineItem, playerState: playerState, transcriptionState: transcriptionState)
         default:
             EmptyView()
         }

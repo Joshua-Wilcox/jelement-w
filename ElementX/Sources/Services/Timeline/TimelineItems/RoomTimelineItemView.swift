@@ -72,7 +72,8 @@ struct RoomTimelineItemView: View {
             let playerState = context?.viewState.audioPlayerStateProvider?(item.id) ?? AudioPlayerState(id: .timelineItemIdentifier(item.id),
                                                                                                         title: L10n.commonVoiceMessage,
                                                                                                         duration: 0)
-            VoiceMessageRoomTimelineView(timelineItem: item, playerState: playerState)
+            let transcriptionState = item.content.source.flatMap { context?.viewState.voiceMessageTranscriptionStateProvider?($0) }
+            VoiceMessageRoomTimelineView(timelineItem: item, playerState: playerState, transcriptionState: transcriptionState)
         case .callInvite:
             CallInviteRoomTimelineView()
         case .callNotification(let item):
