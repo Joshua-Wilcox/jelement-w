@@ -61,12 +61,7 @@ targets:
 
     entitlements:
       path: NSE.entitlements
-      properties:
-        com.apple.developer.usernotifications.filtering: true
-        com.apple.security.application-groups:
-        - $(APP_GROUP_IDENTIFIER)
-        keychain-access-groups:
-        - $(KEYCHAIN_ACCESS_GROUP_IDENTIFIER)
+      properties: {}
 
     settings:
       base:
