@@ -1225,6 +1225,51 @@ nonisolated class AudioConverterMock: AudioConverterProtocol, @unchecked Sendabl
         try convertToMPEG4AACSourceURLDestinationURLClosure?(sourceURL, destinationURL)
     }
 }
+nonisolated class AudioFileTranscriberMock: AudioFileTranscriberProtocol, @unchecked Sendable {
+
+    //MARK: - transcribe
+
+    private let transcribeFileURLCallsCountLock = NSLock()
+    private nonisolated(unsafe) var transcribeFileURLUnderlyingCallsCount = 0
+    var transcribeFileURLCallsCount: Int {
+        get { transcribeFileURLCallsCountLock.withLock { transcribeFileURLUnderlyingCallsCount } }
+        set { transcribeFileURLCallsCountLock.withLock { transcribeFileURLUnderlyingCallsCount = newValue } }
+    }
+    var transcribeFileURLCalled: Bool {
+        return transcribeFileURLCallsCount > 0
+    }
+    private let transcribeFileURLReceivedFileURLLock = NSLock()
+    private nonisolated(unsafe) var transcribeFileURLUnderlyingReceivedFileURL: URL?
+    var transcribeFileURLReceivedFileURL: URL? {
+        get { transcribeFileURLReceivedFileURLLock.withLock { transcribeFileURLUnderlyingReceivedFileURL } }
+        set { transcribeFileURLReceivedFileURLLock.withLock { transcribeFileURLUnderlyingReceivedFileURL = newValue } }
+    }
+    private let transcribeFileURLReceivedInvocationsLock = NSLock()
+    private nonisolated(unsafe) var transcribeFileURLUnderlyingReceivedInvocations: [URL] = []
+    var transcribeFileURLReceivedInvocations: [URL] {
+        get { transcribeFileURLReceivedInvocationsLock.withLock { transcribeFileURLUnderlyingReceivedInvocations } }
+        set { transcribeFileURLReceivedInvocationsLock.withLock { transcribeFileURLUnderlyingReceivedInvocations = newValue } }
+    }
+
+    private let transcribeFileURLReturnValueLock = NSLock()
+    private nonisolated(unsafe) var transcribeFileURLUnderlyingReturnValue: Result<AudioTranscript, AudioFileTranscriberError>!
+    var transcribeFileURLReturnValue: Result<AudioTranscript, AudioFileTranscriberError>! {
+        get { transcribeFileURLReturnValueLock.withLock { transcribeFileURLUnderlyingReturnValue } }
+        set { transcribeFileURLReturnValueLock.withLock { transcribeFileURLUnderlyingReturnValue = newValue } }
+    }
+    nonisolated(unsafe) var transcribeFileURLClosure: ((URL) async -> Result<AudioTranscript, AudioFileTranscriberError>)?
+
+    @concurrent func transcribe(fileURL: URL) async -> Result<AudioTranscript, AudioFileTranscriberError> {
+        transcribeFileURLCallsCountLock.withLock { transcribeFileURLUnderlyingCallsCount += 1 }
+        transcribeFileURLReceivedFileURL = fileURL
+        transcribeFileURLReceivedInvocationsLock.withLock { transcribeFileURLUnderlyingReceivedInvocations.append(fileURL) }
+        if let transcribeFileURLClosure = transcribeFileURLClosure {
+            return await transcribeFileURLClosure(fileURL)
+        } else {
+            return transcribeFileURLReturnValue
+        }
+    }
+}
 nonisolated class AudioPlayerMock: AudioPlayerProtocol, @unchecked Sendable {
     nonisolated(unsafe) var sourceURL: URL?
     var duration: TimeInterval {
