@@ -35,9 +35,9 @@ struct ComposerToolbar: View {
         Compound.supportsGlass ? 0 : 3
     }
     
-    /// The height of the trailing button, which the voice message recording button floats above.
-    private var trailingButtonSize: CGFloat {
-        Compound.supportsGlass ? 44 : 36
+    /// The height of the delete button, which the pause and resume button floats above.
+    private var voiceMessageTrashButtonSize: CGFloat {
+        Compound.supportsGlass ? 44 : 30
     }
     
     var body: some View {
@@ -115,10 +115,6 @@ struct ComposerToolbar: View {
                         .scaledPadding(.vertical, trailingButtonVerticalPadding, relativeTo: .compound.headingLG)
                 }
             }
-        }
-        .overlay(alignment: .bottomTrailing) {
-            pauseResumeRecordingButton
-                .scaledOffset(y: -(trailingButtonSize + trailingButtonVerticalPadding + 8), relativeTo: .compound.headingLG)
         }
         .animation(.linear(duration: 0.15), value: context.viewState.composerMode)
     }
@@ -310,7 +306,7 @@ struct ComposerToolbar: View {
         }
     }
     
-    /// The button that pauses and resumes the recording, floating above the send button.
+    /// The button that pauses and resumes the recording, floating above the delete button.
     @ViewBuilder
     private var pauseResumeRecordingButton: some View {
         switch context.viewState.composerMode {
@@ -332,6 +328,10 @@ struct ComposerToolbar: View {
             context.send(viewAction: .voiceMessage(.deleteRecording))
         }
         .accessibilityLabel(L10n.a11yDelete)
+        .overlay(alignment: .bottom) {
+            pauseResumeRecordingButton
+                .scaledOffset(y: -(voiceMessageTrashButtonSize + 8), relativeTo: .compound.headingLG)
+        }
     }
     
     private func voiceMessagePreviewComposer(audioPlayerState: AudioPlayerState, waveform: WaveformSource) -> some View {
