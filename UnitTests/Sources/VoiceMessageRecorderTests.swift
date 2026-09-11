@@ -6,6 +6,7 @@
 // Please see LICENSE files in the repository root for full details.
 //
 
+import AVFoundation
 import Combine
 @testable import ElementX
 import Foundation
@@ -413,6 +414,38 @@ struct VoiceMessageRecorderTests {
         } else {
             Issue.record("converted file URL is missing")
         }
+    }
+    
+    @Test
+    func sendVoiceMessage_ResumedRecordingUsesTheMergedFile() async throws {
+        let audioFileURL = try #require(Bundle(for: UnitTestsAppCoordinator.self).url(forResource: "test_voice_message", withExtension: "m4a"), "Test audio file is missing")
+        audioSegmentMerger.mergeIntoClosure = { urls, destination in
+            try await AudioSegmentMerger().merge(urls, into: destination)
+        }
+        
+        await setRecordingComplete(fileURL: audioFileURL, duration: 5)
+        await setResumedRecordingComplete(fileURL: audioFileURL, duration: 3)
+        
+        var convertedSourceURL: URL?
+        audioConverter.convertToOpusOggSourceURLDestinationURLClosure = { source, destination in
+            convertedSourceURL = source
+            try? FileManager.default.removeItem(at: destination)
+            try AudioConverter().convertToOpusOgg(sourceURL: source, destinationURL: destination)
+        }
+        
+        let timelineProxy = TimelineProxyMock()
+        let timelineController = TimelineControllerMock(.init(timelineProxy: timelineProxy))
+        timelineProxy.sendVoiceMessageUrlAudioInfoWaveformRequestHandleReturnValue = .success(())
+        
+        guard case .success = await voiceMessageRecorder.sendVoiceMessage(timelineController: timelineController, audioConverter: audioConverter) else {
+            Issue.record("A success is expected")
+            return
+        }
+        
+        let sourceURL = try #require(convertedSourceURL)
+        #expect(sourceURL == voiceMessageCache.urlForRecording)
+        let sourceFile = try AVAudioFile(forReading: sourceURL)
+        #expect(sourceFile.fileFormat.sampleRate == AudioSegmentMerger.sampleRate)
     }
     
     @Test
