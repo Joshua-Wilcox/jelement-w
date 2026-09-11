@@ -1365,6 +1365,7 @@
 		D8F1462EA00AFC939FF9ACCA /* target.yml in Resources */ = {isa = PBXBuildFile; fileRef = 203D1ACC20287F8986C959D3 /* target.yml */; };
 		D978D344E82F4E10F3961519 /* portrait_test_image.jpg in Resources */ = {isa = PBXBuildFile; fileRef = D09020DC830A83F768DCE4C8 /* portrait_test_image.jpg */; };
 		D98B5EE8C4F5A2CE84687AE8 /* UTType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 897DF5E9A70CE05A632FC8AF /* UTType.swift */; };
+		D9F03F85EF7F32E7383DD3CF /* VoiceMessageTranscriptionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EAA632B447367A5E0262558 /* VoiceMessageTranscriptionView.swift */; };
 		D9F80CE61BF8FF627FDB0543 /* LoadableImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = C352359663A0E52BA20761EE /* LoadableImage.swift */; };
 		DA10C99BA43A0F1E732F6274 /* LogLevel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2711E5996016ABD6EAAEB58A /* LogLevel.swift */; };
 		DA4ABC37ED49F6617091F142 /* MapLibreInterface.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 842F63AA68E8EB410B1BA29F /* MapLibreInterface.framework */; };
@@ -2008,6 +2009,7 @@
 		2DA4F09CB613C54FDC73AE6A /* ThreadDecorator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThreadDecorator.swift; sourceTree = "<group>"; };
 		2DB0E533508094156D8024C3 /* TimelineStyler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineStyler.swift; sourceTree = "<group>"; };
 		2E11E7C396ED06A154CF6DF3 /* cs */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = cs; path = cs.lproj/SAS.strings; sourceTree = "<group>"; };
+		2EAA632B447367A5E0262558 /* VoiceMessageTranscriptionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceMessageTranscriptionView.swift; sourceTree = "<group>"; };
 		2F06F70B9C433BAD4BC6B9F5 /* EncryptedRoomTimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EncryptedRoomTimelineView.swift; sourceTree = "<group>"; };
 		2F36C5D9B37E50915ECBD3EE /* RoomMemberProxy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomMemberProxy.swift; sourceTree = "<group>"; };
 		2F65178687F725E8924B723C /* TimelineFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineFixtures.swift; sourceTree = "<group>"; };
@@ -7387,6 +7389,7 @@
 				93C713D124FE915ABF47A6B7 /* TimelineView.swift */,
 				81F0325E252B057FAEEE1B2D /* TypingIndicatorView.swift */,
 				9E3B41C36800DD4558D7BDA7 /* VoiceMessageRoomPlaybackView.swift */,
+				2EAA632B447367A5E0262558 /* VoiceMessageTranscriptionView.swift */,
 				505AE6F89590187813390D12 /* ItemMenu */,
 				C13DBC8C4A879A5A9C781BBD /* Polls */,
 				B470504BE2DC95FAC94FDD79 /* ReadReceipts */,
@@ -9615,6 +9618,7 @@
 				1224084B7E289E0830BA2C54 /* VoiceMessageRoomTimelineView.swift in Sources */,
 				A609F45A62097FA40C14BB55 /* VoiceMessageTranscriptionService.swift in Sources */,
 				D891B7C79B609FA5547981F3 /* VoiceMessageTranscriptionServiceProtocol.swift in Sources */,
+				D9F03F85EF7F32E7383DD3CF /* VoiceMessageTranscriptionView.swift in Sources */,
 				1CA094038D4D036A6F0A1314 /* VoiceMessageTrashButton.swift in Sources */,
 				EA4848108A6FE53A4085C9B1 /* VolatileUserDefaults.swift in Sources */,
 				CA12AE0DCD57D49CD96C699A /* WaveformCursorView.swift in Sources */,

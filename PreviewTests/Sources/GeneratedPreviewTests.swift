@@ -1601,6 +1601,13 @@ extension PreviewTests {
     }
 
     @Test
+    func voiceMessageTranscriptionView() async throws {
+        for (index, preview) in VoiceMessageTranscriptionView_Previews._allPreviews.enumerated() {
+            try await assertSnapshots(matching: preview, step: index)
+        }
+    }
+
+    @Test
     func voiceMessageTrashButton() async throws {
         for (index, preview) in VoiceMessageTrashButton_Previews._allPreviews.enumerated() {
             try await assertSnapshots(matching: preview, step: index)

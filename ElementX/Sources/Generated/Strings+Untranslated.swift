@@ -10,6 +10,14 @@ import Foundation
 // swiftlint:disable explicit_type_interface function_parameter_count identifier_name line_length
 // swiftlint:disable nesting type_body_length type_name vertical_whitespace_opening_braces
 internal nonisolated enum UntranslatedL10n {
+  /// Transcribe
+  internal static var actionTranscribeIos: String { return UntranslatedL10n.tr("Untranslated", "action_transcribe_ios") }
+  /// Transcribing…
+  internal static var commonTranscribingIos: String { return UntranslatedL10n.tr("Untranslated", "common_transcribing_ios") }
+  /// Couldn’t transcribe this voice message.
+  internal static var errorVoiceMessageTranscriptionFailedIos: String { return UntranslatedL10n.tr("Untranslated", "error_voice_message_transcription_failed_ios") }
+  /// Transcription isn’t available in your device’s language.
+  internal static var errorVoiceMessageTranscriptionUnsupportedLanguageIos: String { return UntranslatedL10n.tr("Untranslated", "error_voice_message_transcription_unsupported_language_ios") }
   /// Search
   internal static var screenHomeTabSearch: String { return UntranslatedL10n.tr("Untranslated", "screen_home_tab_search") }
   /// Search for chats and messages

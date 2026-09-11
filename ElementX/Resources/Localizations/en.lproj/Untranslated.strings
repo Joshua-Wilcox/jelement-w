@@ -1,3 +1,7 @@
+"action_transcribe_ios" = "Transcribe";
+"common_transcribing_ios" = "Transcribing…";
+"error_voice_message_transcription_failed_ios" = "Couldn’t transcribe this voice message.";
+"error_voice_message_transcription_unsupported_language_ios" = "Transcription isn’t available in your device’s language.";
 "screen_home_tab_search" = "Search";
 "screen_search_empty_state_message" = "Search for chats and messages";
 "screen_search_empty_state_title" = "Start searching...";
