@@ -12,13 +12,17 @@ import Speech
 /// neither a speech recognition permission nor a network connection once its model is installed.
 @available(iOS 26.0, *)
 nonisolated struct AudioFileTranscriber: AudioFileTranscriberProtocol {
-    func transcribe(fileURL: URL) async -> Result<String, AudioFileTranscriberError> {
+    func transcribe(fileURL: URL) async -> Result<AudioTranscript, AudioFileTranscriberError> {
         guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: .current) else {
             MXLog.error("Speech transcription isn't supported for the current locale.")
             return .failure(.unsupportedLocale)
         }
         
-        let transcriber = SpeechTranscriber(locale: locale, preset: .transcription)
+        let preset = SpeechTranscriber.Preset.transcription
+        let transcriber = SpeechTranscriber(locale: locale,
+                                            transcriptionOptions: preset.transcriptionOptions,
+                                            reportingOptions: preset.reportingOptions,
+                                            attributeOptions: preset.attributeOptions.union([.audioTimeRange]))
         
         do {
             // The model is shared system-wide and only downloaded the first time a locale is used.
@@ -38,8 +42,8 @@ nonisolated struct AudioFileTranscriber: AudioFileTranscriberProtocol {
                 await analyzer.cancelAndFinishNow()
             }
             
-            let transcript = try await String(attributedTranscript.characters).trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !transcript.isEmpty else {
+            let transcript = try await AudioTranscript(attributedTranscript)
+            guard !transcript.text.isEmpty else {
                 MXLog.error("No speech was recognised in the audio file.")
                 return .failure(.failedTranscribing)
             }
@@ -48,5 +52,31 @@ nonisolated struct AudioFileTranscriber: AudioFileTranscriberProtocol {
             MXLog.error("Failed transcribing the audio file: \(error)")
             return .failure(.failedTranscribing)
         }
+    }
+}
+
+@available(iOS 26.0, *)
+private extension AudioTranscript {
+    init(_ attributedTranscript: AttributedString) {
+        var text = ""
+        var words: [Word] = []
+        
+        // The transcriber delivers a run per word, each one carrying the time range it was spoken in.
+        for run in attributedTranscript.runs {
+            var runText = String(attributedTranscript[run.range].characters)
+            
+            // A run includes the whitespace that separates it from the one before, which would
+            // otherwise indent the transcript.
+            if text.isEmpty {
+                runText = String(runText.drop(while: \.isWhitespace))
+            }
+            text += runText
+            
+            if let timeRange = run.audioTimeRange, !runText.isEmpty {
+                words.append(Word(endOffset: text.count, startTime: timeRange.start.seconds))
+            }
+        }
+        
+        self.init(text: text.trimmingCharacters(in: .whitespacesAndNewlines), words: words)
     }
 }

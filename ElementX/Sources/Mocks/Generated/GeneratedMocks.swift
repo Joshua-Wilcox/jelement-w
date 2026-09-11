@@ -1252,14 +1252,14 @@ nonisolated class AudioFileTranscriberMock: AudioFileTranscriberProtocol, @unche
     }
 
     private let transcribeFileURLReturnValueLock = NSLock()
-    private nonisolated(unsafe) var transcribeFileURLUnderlyingReturnValue: Result<String, AudioFileTranscriberError>!
-    var transcribeFileURLReturnValue: Result<String, AudioFileTranscriberError>! {
+    private nonisolated(unsafe) var transcribeFileURLUnderlyingReturnValue: Result<AudioTranscript, AudioFileTranscriberError>!
+    var transcribeFileURLReturnValue: Result<AudioTranscript, AudioFileTranscriberError>! {
         get { transcribeFileURLReturnValueLock.withLock { transcribeFileURLUnderlyingReturnValue } }
         set { transcribeFileURLReturnValueLock.withLock { transcribeFileURLUnderlyingReturnValue = newValue } }
     }
-    nonisolated(unsafe) var transcribeFileURLClosure: ((URL) async -> Result<String, AudioFileTranscriberError>)?
+    nonisolated(unsafe) var transcribeFileURLClosure: ((URL) async -> Result<AudioTranscript, AudioFileTranscriberError>)?
 
-    @concurrent func transcribe(fileURL: URL) async -> Result<String, AudioFileTranscriberError> {
+    @concurrent func transcribe(fileURL: URL) async -> Result<AudioTranscript, AudioFileTranscriberError> {
         transcribeFileURLCallsCountLock.withLock { transcribeFileURLUnderlyingCallsCount += 1 }
         transcribeFileURLReceivedFileURL = fileURL
         transcribeFileURLReceivedInvocationsLock.withLock { transcribeFileURLUnderlyingReceivedInvocations.append(fileURL) }

@@ -18,7 +18,7 @@ enum VoiceMessageTranscriptionError: Error, Equatable {
 enum VoiceMessageTranscriptionStatus: Equatable {
     case idle
     case loading
-    case completed(transcript: String)
+    case completed(transcript: AudioTranscript)
     case failed(VoiceMessageTranscriptionError)
 }
 

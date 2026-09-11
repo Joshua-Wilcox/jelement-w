@@ -47,7 +47,9 @@ struct VoiceMessageRoomTimelineContent: View {
                     .fixedSize(horizontal: false, vertical: true)
                 
                 if let transcriptionState {
-                    VoiceMessageTranscriptionView(transcriptionState: transcriptionState, onTranscribe: onTranscribe)
+                    VoiceMessageTranscriptionView(transcriptionState: transcriptionState,
+                                                  playerState: playerState,
+                                                  onTranscribe: onTranscribe)
                         .padding(.leading, 2)
                         .padding(.trailing, 8)
                 }
@@ -123,7 +125,7 @@ struct VoiceMessageRoomTimelineView_Previews: PreviewProvider, TestablePreview {
     static let transcriptionStates: [VoiceMessageTranscriptionState] = [
         .init(),
         .init(status: .loading),
-        .init(status: .completed(transcript: "Hi Bob, I'll be there at 5pm. Could you bring the slides for tomorrow's meeting?")),
+        .init(status: .completed(transcript: .mockTranscript)),
         .init(status: .failed(.unsupportedLanguage)),
         .init(status: .failed(.failedTranscribing))
     ]

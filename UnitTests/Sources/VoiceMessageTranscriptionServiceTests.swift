@@ -12,7 +12,7 @@ import Testing
 @MainActor
 struct VoiceMessageTranscriptionServiceTests {
     private static let voiceMessageURL = URL("file:///voice-message.m4a")
-    private static let transcript = "Hi Bob, I'll be there at 5pm."
+    private static let transcript = AudioTranscript(text: "Hi Bob, I'll be there at 5pm.")
     
     private let voiceMessageMediaManager: VoiceMessageMediaManagerMock
     private let audioFileTranscriber: AudioFileTranscriberMock
