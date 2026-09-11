@@ -8,7 +8,6 @@
 import Foundation
 
 nonisolated enum AudioSegmentMergerError: Error {
-    case missingAudioTrack
     case mergeFailed(Error?)
 }
 
