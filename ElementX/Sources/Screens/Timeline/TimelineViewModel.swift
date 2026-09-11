@@ -129,6 +129,10 @@ class TimelineViewModel: TimelineViewModelType, TimelineViewModelProtocol {
             return self.timelineInteractionHandler.audioPlayerState(for: itemID)
         }
         
+        state.voiceMessageTranscriptionStateProvider = { [weak self] source in
+            self?.userSession.voiceMessageTranscriptionService?.transcriptionState(for: source)
+        }
+        
         state.pillContextUpdater = { [weak self] pillContext in
             self?.pillContextUpdater(pillContext)
         }
@@ -228,6 +232,8 @@ class TimelineViewModel: TimelineViewModelType, TimelineViewModelProtocol {
             handlePollAction(pollAction)
         case .handleAudioPlayerAction(let audioPlayerAction):
             handleAudioPlayerAction(audioPlayerAction)
+        case .transcribeVoiceMessage(let itemID):
+            Task { await timelineInteractionHandler.transcribeVoiceMessage(for: itemID) }
         case .stopLiveLocationSharing(let id):
             state.stoppedLiveLocationIDs.insert(id)
             Task { await stopLiveLocationSharing() }

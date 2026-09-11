@@ -12,11 +12,14 @@ import SwiftUI
 struct VoiceMessageRoomTimelineView: View {
     let timelineItem: VoiceMessageRoomTimelineItem
     let playerState: AudioPlayerState
+    /// The transcription of the message, `nil` when transcription isn't available.
+    var transcriptionState: VoiceMessageTranscriptionState?
     
     var body: some View {
         TimelineStyler(timelineItem: timelineItem) {
             VoiceMessageRoomTimelineContent(timelineItem: timelineItem,
-                                            playerState: playerState)
+                                            playerState: playerState,
+                                            transcriptionState: transcriptionState)
                 .frame(maxWidth: 400)
         }
     }
@@ -28,16 +31,29 @@ struct VoiceMessageRoomTimelineContent: View {
     
     let timelineItem: VoiceMessageRoomTimelineItem
     let playerState: AudioPlayerState
+    /// The transcription of the message, `nil` when transcription isn't available.
+    var transcriptionState: VoiceMessageTranscriptionState?
     
     var body: some View {
         ContentScanningView(contentScannerService: context?.contentScannerService,
                             mediaSource: timelineItem.content.source) {
-            VoiceMessageRoomPlaybackView(playerState: playerState,
-                                         onPlayPause: onPlaybackPlayPause,
-                                         onSeek: { onPlaybackSeek($0) },
-                                         onScrubbing: { onPlaybackScrubbing($0) },
-                                         onPlaybackSpeedChange: onPlaybackSpeedChange)
-                .fixedSize(horizontal: false, vertical: true)
+            // Transcribing downloads the audio, so it must stay inside the safe content.
+            VStack(alignment: .leading, spacing: 8) {
+                VoiceMessageRoomPlaybackView(playerState: playerState,
+                                             onPlayPause: onPlaybackPlayPause,
+                                             onSeek: { onPlaybackSeek($0) },
+                                             onScrubbing: { onPlaybackScrubbing($0) },
+                                             onPlaybackSpeedChange: onPlaybackSpeedChange)
+                    .fixedSize(horizontal: false, vertical: true)
+                
+                if let transcriptionState {
+                    VoiceMessageTranscriptionView(transcriptionState: transcriptionState,
+                                                  playerState: playerState,
+                                                  onTranscribe: onTranscribe)
+                        .padding(.leading, 2)
+                        .padding(.trailing, 8)
+                }
+            }
         } scanningContent: {
             VoiceMessageRoomPlaybackView(playerState: playerState,
                                          isScanning: true,
@@ -76,6 +92,10 @@ struct VoiceMessageRoomTimelineContent: View {
             }
         }
     }
+    
+    private func onTranscribe() {
+        context?.send(viewAction: .transcribeVoiceMessage(itemID: timelineItem.id))
+    }
 }
 
 struct VoiceMessageRoomTimelineView_Previews: PreviewProvider, TestablePreview {
@@ -102,6 +122,14 @@ struct VoiceMessageRoomTimelineView_Previews: PreviewProvider, TestablePreview {
                                               waveform: EstimatedWaveform.mockWaveform,
                                               progress: 0.4)
     
+    static let transcriptionStates: [VoiceMessageTranscriptionState] = [
+        .init(),
+        .init(status: .loading),
+        .init(status: .completed(transcript: .mockTranscript)),
+        .init(status: .failed(.unsupportedLanguage)),
+        .init(status: .failed(.failedTranscribing))
+    ]
+    
     static var previews: some View {
         body.environmentObject(viewModel.context)
         
@@ -117,6 +145,18 @@ struct VoiceMessageRoomTimelineView_Previews: PreviewProvider, TestablePreview {
         .fixedSize(horizontal: false, vertical: true)
         .environmentObject(viewModel.context)
         .previewDisplayName("Content Scanner")
+        
+        VStack(spacing: 20) {
+            ForEach(transcriptionStates.indices, id: \.self) { index in
+                VoiceMessageRoomTimelineView(timelineItem: voiceRoomTimelineItem,
+                                             playerState: playerState,
+                                             transcriptionState: transcriptionStates[index])
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .environmentObject(viewModel.context)
+        .environment(\.timelineContext, viewModel.context)
+        .previewDisplayName("Transcription")
     }
     
     static var body: some View {

@@ -84,6 +84,7 @@ enum TimelineViewAction {
     case handlePasteOrDrop(providers: [NSItemProvider])
     case handlePollAction(TimelineViewPollAction)
     case handleAudioPlayerAction(TimelineAudioPlayerAction)
+    case transcribeVoiceMessage(itemID: TimelineItemIdentifier)
     
     case stopLiveLocationSharing(TimelineItemIdentifier)
     
@@ -147,6 +148,9 @@ struct TimelineViewState: BindableState {
     
     /// A closure providing the associated audio player state for an item in the timeline.
     var audioPlayerStateProvider: (@MainActor (_ itemId: TimelineItemIdentifier) -> AudioPlayerState?)?
+    
+    /// A closure providing the transcription state of a voice message, `nil` when transcription isn't available.
+    var voiceMessageTranscriptionStateProvider: (@MainActor (_ source: MediaSourceProxy) -> VoiceMessageTranscriptionState?)?
     
     /// A closure that updates the associated pill context
     var pillContextUpdater: (@MainActor (PillContext) -> Void)?

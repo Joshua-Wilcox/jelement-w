@@ -183,6 +183,38 @@ struct TimelineInteractionHandlerTests {
         #expect(!voiceMessageRecorder.stopRecordingCalled)
     }
     
+    // MARK: - Voice message transcription
+    
+    @Test
+    func transcribesTheVoiceMessageSource() async {
+        let transcriptionService = VoiceMessageTranscriptionServiceMock()
+        let handler = makeHandler(timelineItems: [Self.firstVoiceMessage, Self.secondVoiceMessage],
+                                  voiceMessageTranscriptionService: transcriptionService)
+        
+        await handler.transcribeVoiceMessage(for: Self.secondVoiceMessage.id)
+        
+        #expect(transcriptionService.transcribeVoiceMessageFromCallsCount == 1)
+        #expect(transcriptionService.transcribeVoiceMessageFromReceivedSource == Self.secondVoiceMessage.content.source)
+    }
+    
+    @Test
+    func doesNotTranscribeOtherKindsOfMessage() async {
+        let transcriptionService = VoiceMessageTranscriptionServiceMock()
+        let handler = makeHandler(timelineItems: [Self.textMessage], voiceMessageTranscriptionService: transcriptionService)
+        
+        await handler.transcribeVoiceMessage(for: Self.textMessage.id)
+        
+        #expect(!transcriptionService.transcribeVoiceMessageFromCalled)
+    }
+    
+    @Test
+    func ignoresTranscriptionWhenItIsUnavailable() async {
+        let handler = makeHandler(timelineItems: [Self.firstVoiceMessage])
+        
+        // Nothing to assert against, this shouldn't crash without a service.
+        await handler.transcribeVoiceMessage(for: Self.firstVoiceMessage.id)
+    }
+    
     // MARK: - Helpers
     
     private var loadedSourceURLs: [URL] {
@@ -197,7 +229,8 @@ struct TimelineInteractionHandlerTests {
     }
     
     private func makeHandler(timelineItems: [RoomTimelineItemProtocol],
-                             voiceMessageRecorder: VoiceMessageRecorderMock? = nil) -> TimelineInteractionHandler {
+                             voiceMessageRecorder: VoiceMessageRecorderMock? = nil,
+                             voiceMessageTranscriptionService: VoiceMessageTranscriptionServiceMock? = nil) -> TimelineInteractionHandler {
         let voiceMessageRecorder = voiceMessageRecorder ?? {
             let recorder = VoiceMessageRecorderMock()
             recorder.isRecording = false
@@ -207,7 +240,7 @@ struct TimelineInteractionHandlerTests {
         let voiceMessageMediaManager = VoiceMessageMediaManagerMock()
         voiceMessageMediaManager.loadVoiceMessageFromSourceBodyReturnValue = URL("file:///voice-message.m4a")
         
-        let userSession = UserSessionMock(.init())
+        let userSession = UserSessionMock(.init(voiceMessageTranscriptionService: voiceMessageTranscriptionService))
         userSession.voiceMessageMediaManager = voiceMessageMediaManager
         
         let appSettings = AppSettings.volatile()

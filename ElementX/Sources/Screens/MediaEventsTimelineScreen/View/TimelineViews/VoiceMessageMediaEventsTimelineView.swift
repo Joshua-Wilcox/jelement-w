@@ -12,6 +12,8 @@ import SwiftUI
 struct VoiceMessageMediaEventsTimelineView: View {
     let timelineItem: VoiceMessageRoomTimelineItem
     let playerState: AudioPlayerState
+    /// The transcription of the message, `nil` when transcription isn't available.
+    var transcriptionState: VoiceMessageTranscriptionState?
     
     /// Whether the item's media failed content scanning, in which case the bubble adopts
     /// the critical styling. Reported by the `ContentScanningView` through the preference key.
@@ -19,7 +21,8 @@ struct VoiceMessageMediaEventsTimelineView: View {
     
     var body: some View {
         VoiceMessageRoomTimelineContent(timelineItem: timelineItem,
-                                        playerState: playerState)
+                                        playerState: playerState,
+                                        transcriptionState: transcriptionState)
             .accessibilityLabel(L10n.commonVoiceMessage)
             .frame(maxWidth: .infinity, alignment: .leading)
             .bubbleBackground(isOutgoing: timelineItem.isOutgoing,
