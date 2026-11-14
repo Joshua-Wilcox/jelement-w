@@ -19,3 +19,10 @@
 "soft_logout_signin_notice" = "Your homeserver (%1$s) admin has signed you out of your account %2$s (%3$s).";
 "soft_logout_signin_title" = "Sign in";
 "untranslated" = "Untranslated";
+"screen_room_details_chat_background_ios" = "Chat background";
+"common_chat_background_default_ios" = "Default";
+"common_chat_background_blue_ios" = "Blue";
+"common_chat_background_green_ios" = "Green";
+"common_chat_background_purple_ios" = "Purple";
+"action_choose_chat_background_photo_ios" = "Choose photo";
+"error_chat_background_ios" = "Couldn’t update the chat background.";

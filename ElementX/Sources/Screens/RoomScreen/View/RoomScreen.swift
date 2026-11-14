@@ -14,6 +14,7 @@ import WysiwygComposer
 struct RoomScreen: View {
     @ObservedObject private var context: RoomScreenViewModelType.Context
     @ObservedObject private var timelineContext: TimelineViewModelType.Context
+    private let chatBackgroundStore: ChatBackgroundStore?
     let composerToolbar: ComposerToolbar
     @Environment(\.accessibilityVoiceOverEnabled) private var isVoiceOverEnabled
     
@@ -28,14 +29,24 @@ struct RoomScreen: View {
     
     init(context: RoomScreenViewModelType.Context,
          timelineContext: TimelineViewModelType.Context,
-         composerToolbar: ComposerToolbar) {
+         composerToolbar: ComposerToolbar,
+         chatBackgroundStore: ChatBackgroundStore? = nil) {
+        self.chatBackgroundStore = chatBackgroundStore
         self.context = context
         self.timelineContext = timelineContext
         self.composerToolbar = composerToolbar
     }
     
     var body: some View {
-        TimelineView(timelineContext: timelineContext)
+        let background = chatBackgroundStore?.background(for: timelineContext.viewState.roomID) ?? .standard
+        TimelineView(timelineContext: timelineContext, showsChatBackground: background != .standard)
+            .background {
+                if background != .standard {
+                    ChatBackgroundSurface(background: background)
+                } else {
+                    Color.compound.bgCanvasDefault
+                }
+            }
             .overlay {
                 // Sits below the bottom-trailing overlay in z-order, so taps on the pill or
                 // buttons still go to them; taps anywhere else dismiss the pill.
@@ -71,7 +82,6 @@ struct RoomScreen: View {
                 .padding()
                 .animation(.elementDefault, value: markAsReadSource)
             }
-            .background(Color.compound.bgCanvasDefault.ignoresSafeArea())
             .topBanners([
                 TopBannerLayer(verticalBanners: [
                     TopBannerItem(pinnedItemsBanner, isVisible: context.viewState.shouldShowPinnedEventsBanner && !isVoiceOverEnabled),

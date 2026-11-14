@@ -7,11 +7,15 @@
 //
 
 import Compound
+import MatrixRustSDK
 import SwiftUI
 
 struct RoomDetailsScreen: View {
     @Bindable var context: RoomDetailsScreenViewModel.Context
     
+    var chatBackgroundStore: ChatBackgroundStore?
+    var roomID: String?
+    @State private var showsChatBackground = false
     @State private var isTopicExpanded = false
     
     var body: some View {
@@ -31,6 +35,13 @@ struct RoomDetailsScreen: View {
                 peopleSection
             }
             
+            if chatBackgroundStore != nil, roomID != nil {
+                Section {
+                    ListRow(label: .plain(title: UntranslatedL10n.screenRoomDetailsChatBackgroundIos),
+                            kind: .button { showsChatBackground = true })
+                }
+            }
+            
             configurationSection
             
             securitySection
@@ -44,6 +55,11 @@ struct RoomDetailsScreen: View {
             leaveRoomSection
         }
         .compoundList()
+        .sheet(isPresented: $showsChatBackground) {
+            if let chatBackgroundStore, let roomID {
+                ChatBackgroundSettings(store: chatBackgroundStore, roomID: roomID)
+            }
+        }
         .alert(item: $context.alertInfo)
         .alert(item: $context.leaveRoomAlertItem,
                actions: leaveRoomAlertActions,
@@ -356,8 +372,6 @@ struct RoomDetailsScreen: View {
 }
 
 // MARK: - Previews
-
-import MatrixRustSDK
 
 @available(iOS 26.0, *)
 struct RoomDetailsScreen_Previews: PreviewProvider, TestablePreview {

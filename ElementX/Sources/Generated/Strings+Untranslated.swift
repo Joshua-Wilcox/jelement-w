@@ -14,16 +14,30 @@ internal nonisolated enum UntranslatedL10n {
   internal static var a11yVoiceMessagePauseRecordingIos: String { return UntranslatedL10n.tr("Untranslated", "a11y_voice_message_pause_recording_ios") }
   /// Resume recording
   internal static var a11yVoiceMessageResumeRecordingIos: String { return UntranslatedL10n.tr("Untranslated", "a11y_voice_message_resume_recording_ios") }
+  /// Choose photo
+  internal static var actionChooseChatBackgroundPhotoIos: String { return UntranslatedL10n.tr("Untranslated", "action_choose_chat_background_photo_ios") }
   /// Transcribe
   internal static var actionTranscribeIos: String { return UntranslatedL10n.tr("Untranslated", "action_transcribe_ios") }
+  /// Blue
+  internal static var commonChatBackgroundBlueIos: String { return UntranslatedL10n.tr("Untranslated", "common_chat_background_blue_ios") }
+  /// Default
+  internal static var commonChatBackgroundDefaultIos: String { return UntranslatedL10n.tr("Untranslated", "common_chat_background_default_ios") }
+  /// Green
+  internal static var commonChatBackgroundGreenIos: String { return UntranslatedL10n.tr("Untranslated", "common_chat_background_green_ios") }
+  /// Purple
+  internal static var commonChatBackgroundPurpleIos: String { return UntranslatedL10n.tr("Untranslated", "common_chat_background_purple_ios") }
   /// Transcribing…
   internal static var commonTranscribingIos: String { return UntranslatedL10n.tr("Untranslated", "common_transcribing_ios") }
+  /// Couldn’t update the chat background.
+  internal static var errorChatBackgroundIos: String { return UntranslatedL10n.tr("Untranslated", "error_chat_background_ios") }
   /// Couldn’t transcribe this voice message.
   internal static var errorVoiceMessageTranscriptionFailedIos: String { return UntranslatedL10n.tr("Untranslated", "error_voice_message_transcription_failed_ios") }
   /// Transcription isn’t available in your device’s language.
   internal static var errorVoiceMessageTranscriptionUnsupportedLanguageIos: String { return UntranslatedL10n.tr("Untranslated", "error_voice_message_transcription_unsupported_language_ios") }
   /// Search
   internal static var screenHomeTabSearch: String { return UntranslatedL10n.tr("Untranslated", "screen_home_tab_search") }
+  /// Chat background
+  internal static var screenRoomDetailsChatBackgroundIos: String { return UntranslatedL10n.tr("Untranslated", "screen_room_details_chat_background_ios") }
   /// Search for chats and messages
   internal static var screenSearchEmptyStateMessage: String { return UntranslatedL10n.tr("Untranslated", "screen_search_empty_state_message") }
   /// Start searching...

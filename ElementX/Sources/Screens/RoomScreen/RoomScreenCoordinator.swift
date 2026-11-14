@@ -57,6 +57,7 @@ final class RoomScreenCoordinator: CoordinatorProtocol {
     private var roomViewModel: RoomScreenViewModelProtocol
     private var timelineViewModel: TimelineViewModelProtocol
     private var composerViewModel: ComposerToolbarViewModelProtocol
+    private let chatBackgroundStore: ChatBackgroundStore?
     private let appSettings: AppSettings
     
     private var cancellables = Set<AnyCancellable>()
@@ -67,6 +68,7 @@ final class RoomScreenCoordinator: CoordinatorProtocol {
     }
     
     init(parameters: RoomScreenCoordinatorParameters) {
+        chatBackgroundStore = parameters.userSession.chatBackgroundStore
         appSettings = parameters.appSettings
         
         var selectedPinnedEventID: String?
@@ -248,7 +250,8 @@ final class RoomScreenCoordinator: CoordinatorProtocol {
         
         return AnyView(RoomScreen(context: roomViewModel.context,
                                   timelineContext: timelineViewModel.context,
-                                  composerToolbar: composerToolbar))
+                                  composerToolbar: composerToolbar,
+                                  chatBackgroundStore: chatBackgroundStore))
     }
 }
 

@@ -123,6 +123,16 @@ class TimelineTableViewController: UIViewController {
         }
     }
     
+    var showsChatBackground = false {
+        didSet {
+            guard oldValue != showsChatBackground else { return }
+            tableView.backgroundColor = showsChatBackground ? .clear : .compound.bgCanvasDefault
+            if let snapshot = dataSource?.snapshot() {
+                dataSource?.applySnapshotUsingReloadData(snapshot)
+            }
+        }
+    }
+    
     var hideTimelineMedia = false {
         didSet {
             guard let snapshot = dataSource?.snapshot() else { return }
@@ -300,15 +310,26 @@ class TimelineTableViewController: UIViewController {
                 let cell = tableView.dequeueReusableCell(withIdentifier: TimelineItemCell.reuseIdentifier, for: indexPath)
                 guard let self, let cell = cell as? TimelineItemCell else { return cell }
                 
+                cell.backgroundColor = .clear
                 let viewState = timelineItemsDictionary[id]
                 cell.item = viewState
                 guard let viewState else {
                     return cell
                 }
                 
-                cell.contentConfiguration = UIHostingConfiguration { [coordinator, hideTimelineMedia] in
+                cell.contentConfiguration = UIHostingConfiguration { [coordinator, hideTimelineMedia, showsChatBackground] in
                     RoomTimelineItemView(viewState: viewState)
                         .id(id)
+                        .background {
+                            if showsChatBackground {
+                                switch viewState.type {
+                                case .separator, .readMarker, .state, .group, .timelineStart:
+                                    Color.compound.bgCanvasDefault.opacity(0.9)
+                                default:
+                                    EmptyView()
+                                }
+                            }
+                        }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .environmentObject(coordinator.context) // Attempted fix at a crash in TimelineItemContextMenu
                         .environment(\.timelineContext, coordinator.context)
