@@ -22,13 +22,56 @@ enum VoiceMessageTranscriptionStatus: Equatable {
     case failed(VoiceMessageTranscriptionError)
 }
 
+enum VoiceMessageSummaryStatus: Equatable {
+    case idle
+    case loading
+    case completed([String])
+    case failed(VoiceMessageSummaryError)
+}
+
 /// The transcription progress of a voice message. Shared by every view of the message so that the
 /// transcript survives the timeline rebuilding its items.
 final class VoiceMessageTranscriptionState: ObservableObject {
     @Published var status: VoiceMessageTranscriptionStatus
     
-    init(status: VoiceMessageTranscriptionStatus = .idle) {
+    @Published private(set) var summaryStatus: VoiceMessageSummaryStatus
+    private var summaryTask: Task<Void, Never>?
+    
+    init(status: VoiceMessageTranscriptionStatus = .idle, summaryStatus: VoiceMessageSummaryStatus = .idle) {
         self.status = status
+        self.summaryStatus = summaryStatus
+    }
+    
+    deinit {
+        summaryTask?.cancel()
+    }
+    
+    func summarize(using summarizer: VoiceMessageSummarizer = .init()) {
+        guard summaryTask == nil, case .completed(let transcript) = status else { return }
+        if case .completed = summaryStatus {
+            return
+        }
+        
+        summaryStatus = .loading
+        summaryTask = Task { [weak self] in
+            let result: VoiceMessageSummaryStatus
+            do {
+                result = try await .completed(summarizer.summarize(transcript.text))
+            } catch let error as VoiceMessageSummaryError {
+                result = .failed(error)
+            } catch {
+                result = .failed(.generationFailed)
+            }
+            guard !Task.isCancelled, let self else { return }
+            summaryTask = nil
+            summaryStatus = result
+        }
+    }
+    
+    func cancelSummary() {
+        summaryTask?.cancel()
+        summaryTask = nil
+        summaryStatus = .idle
     }
 }
 

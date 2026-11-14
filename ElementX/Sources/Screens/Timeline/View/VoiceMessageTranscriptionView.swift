@@ -32,6 +32,12 @@ struct VoiceMessageTranscriptionView: View {
                 .accessibilityElement(children: .combine)
             case .completed(let transcript):
                 VoiceMessageTranscriptView(playerState: playerState, transcript: transcript)
+                if #available(iOS 26.0, *), !transcript.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    VoiceMessageSummaryView(status: transcriptionState.summaryStatus,
+                                            onSummarise: { transcriptionState.summarize() },
+                                            onCancel: transcriptionState.cancelSummary)
+                        .padding(.top, 8)
+                }
             case .failed(let error):
                 Text(message(for: error))
                     .font(.compound.bodySM)
@@ -59,6 +65,60 @@ struct VoiceMessageTranscriptionView: View {
         case .failedLoadingVoiceMessage, .failedTranscribing:
             UntranslatedL10n.errorVoiceMessageTranscriptionFailedIos
         }
+    }
+}
+
+private struct VoiceMessageSummaryView: View {
+    let status: VoiceMessageSummaryStatus
+    let onSummarise: () -> Void
+    let onCancel: () -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Divider()
+            
+            switch status {
+            case .idle:
+                Button(UntranslatedL10n.actionSummariseWithAppleIntelligenceIos, action: onSummarise)
+                    .buttonStyle(.compound(.textLink, size: .small))
+            case .loading:
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text(UntranslatedL10n.commonSummarisingVoiceMessageIos)
+                }
+                .accessibilityElement(children: .combine)
+                Button(L10n.actionCancel, action: onCancel)
+                    .buttonStyle(.compound(.textLink, size: .small))
+            case .completed(let points):
+                Text(UntranslatedL10n.commonVoiceMessageMainPointsIos)
+                    .font(.compound.bodySMSemibold)
+                    .foregroundStyle(.compound.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
+                ForEach(points.indices, id: \.self) { index in
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text("•").accessibilityHidden(true)
+                        Text(points[index])
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .foregroundStyle(.compound.textPrimary)
+                }
+                Text(UntranslatedL10n.commonVoiceMessageSummaryAttributionIos)
+            case .failed(let error):
+                Text(error == .unsupportedLanguage
+                    ? UntranslatedL10n.errorVoiceMessageSummaryLanguageIos
+                    : error == .unavailable
+                    ? UntranslatedL10n.errorVoiceMessageSummaryUnavailableIos
+                    : UntranslatedL10n.errorVoiceMessageSummaryFailedIos)
+                if error != .unsupportedLanguage {
+                    Button(L10n.actionRetry, action: onSummarise)
+                        .buttonStyle(.compound(.textLink, size: .small))
+                }
+            }
+        }
+        .font(.compound.bodySM)
+        .foregroundStyle(.compound.textSecondary)
+        .lineLimit(nil)
+        .fixedSize(horizontal: false, vertical: true)
     }
 }
 
@@ -103,6 +163,8 @@ private struct VoiceMessageTranscriptText: View, Equatable {
     var body: some View {
         Text(attributedText)
             .font(.compound.bodyLG)
+            .lineLimit(nil)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 
@@ -162,4 +224,26 @@ struct VoiceMessageTranscriptionView_Previews: PreviewProvider, TestablePreview 
                          duration: 10,
                          progress: progress)
     }
+}
+
+struct VoiceMessageSummaryView_Previews: PreviewProvider {
+    static var previews: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            ForEach(statuses.indices, id: \.self) { index in
+                VoiceMessageSummaryView(status: statuses[index], onSummarise: { }, onCancel: { })
+            }
+        }
+        .frame(width: 260)
+        .padding()
+        .previewDisplayName("Main points")
+    }
+    
+    private static let statuses: [VoiceMessageSummaryStatus] = [
+        .idle,
+        .loading,
+        .completed(["Arriving at 5pm.", "Bring the slides for tomorrow’s meeting."]),
+        .failed(.unavailable),
+        .failed(.unsupportedLanguage),
+        .failed(.generationFailed)
+    ]
 }
