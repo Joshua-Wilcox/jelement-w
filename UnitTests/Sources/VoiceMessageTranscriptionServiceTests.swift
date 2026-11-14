@@ -49,6 +49,18 @@ struct VoiceMessageTranscriptionServiceTests {
     }
     
     @Test
+    func longSummaryReservesSpaceForEverySection() async throws {
+        let transcript = String(repeating: "Discussion about a project. ", count: 100)
+        var calls = 0
+        let summarizer = VoiceMessageSummarizer { _, _ in
+            calls += 1
+            return (1...5).map { "Section \(calls), point \($0)" }
+        }
+        let points = try await summarizer.summarize(transcript)
+        #expect(points == (1...5).map { "Section \($0), point 1" })
+    }
+    
+    @Test
     func summarySplitsAgainWhenTheModelReportsAContextLimit() async throws {
         let text = String(repeating: "🙂", count: 40) + "!"
         let summarizer = VoiceMessageSummarizer { input, isCombining in
