@@ -29,6 +29,8 @@ class ClientProxy: ClientProxyProtocol {
     private var roomListStateLoadingStateUpdateTaskHandle: TaskHandle?
     
     private var syncService: SyncService
+    private let usesClassicSync: Bool
+    private var classicSyncTask: Task<Void, Never>?
     // periphery: ignore - only for retain
     private var syncServiceStateUpdateTaskHandle: TaskHandle?
     
@@ -57,10 +59,22 @@ class ClientProxy: ClientProxyProtocol {
     
     // These following summary providers both operate on the same allRooms() list but
     // can apply their own filtering and pagination
-    private(set) var roomSummaryProvider: RoomSummaryProviderProtocol
-    private(set) var alternateRoomSummaryProvider: RoomSummaryProviderProtocol
+    var roomSummaryProvider: RoomSummaryProviderProtocol {
+        mainRoomSummaryProvider
+    }
     
-    private(set) var staticRoomSummaryProvider: StaticRoomSummaryProviderProtocol
+    private let mainRoomSummaryProvider: RoomSummaryProvider
+    var alternateRoomSummaryProvider: RoomSummaryProviderProtocol {
+        secondaryRoomSummaryProvider
+    }
+    
+    private let secondaryRoomSummaryProvider: RoomSummaryProvider
+    
+    var staticRoomSummaryProvider: StaticRoomSummaryProviderProtocol {
+        allRoomSummaryProvider
+    }
+    
+    private let allRoomSummaryProvider: RoomSummaryProvider
     
     let notificationSettings: NotificationSettingsProxyProtocol
     
@@ -153,6 +167,7 @@ class ClientProxy: ClientProxyProtocol {
     private var hasEncounteredAuthError = false
     
     deinit {
+        classicSyncTask?.cancel()
         // Stop the sync and cancel the delegate (in that order) before the client is released. No need to pause
         // the client as it's being deallocated, so the SDK tears it down anyway. Capture the sync service strongly
         // as `self` is being deallocated.
@@ -241,20 +256,26 @@ class ClientProxy: ClientProxyProtocol {
         
         capabilities = HomeserverCapabilitiesProxy(underlyingCapabilities: client.homeserverCapabilities())
         
+        // Beeper excludes bridged rooms from Sliding Sync, including explicit room subscriptions.
+        let usesClassicSync = URL(string: client.homeserver())?.host() == "matrix.beeper.com"
+        self.usesClassicSync = usesClassicSync
         let configuredAppService = try await ClientProxyServices(client: client,
                                                                  notificationSettings: notificationSettings,
-                                                                 appSettings: appSettings)
+                                                                 appSettings: appSettings,
+                                                                 usesClassicSync: usesClassicSync)
         
         syncService = configuredAppService.syncService
         roomListService = configuredAppService.roomListService
-        roomSummaryProvider = configuredAppService.roomSummaryProvider
-        alternateRoomSummaryProvider = configuredAppService.alternateRoomSummaryProvider
-        staticRoomSummaryProvider = configuredAppService.staticRoomSummaryProvider
+        mainRoomSummaryProvider = configuredAppService.roomSummaryProvider
+        secondaryRoomSummaryProvider = configuredAppService.alternateRoomSummaryProvider
+        allRoomSummaryProvider = configuredAppService.staticRoomSummaryProvider
         eventStringBuilder = configuredAppService.eventStringBuilder
         
-        syncServiceStateUpdateTaskHandle = createSyncServiceStateObserver(syncService)
-        roomListStateUpdateTaskHandle = createRoomListServiceObserver(roomListService)
-        roomListStateLoadingStateUpdateTaskHandle = createRoomListLoadingStateUpdateObserver(roomListService)
+        if !usesClassicSync {
+            syncServiceStateUpdateTaskHandle = createSyncServiceStateObserver(syncService)
+            roomListStateUpdateTaskHandle = createRoomListServiceObserver(roomListService)
+            roomListStateLoadingStateUpdateTaskHandle = createRoomListLoadingStateUpdateObserver(roomListService)
+        }
         
         delegateHandle = try client.setDelegate(delegate: ClientDelegateWrapper { [weak self] isSoftLogout in
             // Called by the SDK from arbitrary threads, hop to the main actor where the proxy lives.
@@ -276,7 +297,7 @@ class ClientProxy: ClientProxyProtocol {
         
         try await client.setUtdDelegate(utdDelegate: ClientDecryptionErrorDelegate(actionsSubject: actionsSubject))
         
-        let canSubscribeToUserProfile = if await (try? client.isProfilesSlidingSyncExtensionSupported()) == true {
+        let canSubscribeToUserProfile = if !usesClassicSync, await (try? client.isProfilesSlidingSyncExtensionSupported()) == true {
             true
         } else {
             false
@@ -1167,8 +1188,12 @@ class ClientProxy: ClientProxyProtocol {
                 return
             }
             
-            MXLog.info("Starting sync")
-            await syncService.start()
+            if usesClassicSync {
+                startClassicSync()
+            } else {
+                MXLog.info("Starting sync")
+                await syncService.start()
+            }
             
             updateHomeserverReachability()
             
@@ -1183,9 +1208,16 @@ class ClientProxy: ClientProxyProtocol {
         case .suspended:
             updateHomeserverReachability()
             
-            MXLog.info("Stopping sync")
-            await syncService.stop()
-            MXLog.info("Sync stopped")
+            if usesClassicSync {
+                let task = classicSyncTask
+                classicSyncTask = nil
+                task?.cancel()
+                await task?.value
+            } else {
+                MXLog.info("Stopping sync")
+                await syncService.stop()
+                MXLog.info("Sync stopped")
+            }
             
             if appSettings.clientPausingAndResumingEnabled {
                 do {
@@ -1195,6 +1227,64 @@ class ClientProxy: ClientProxyProtocol {
                     MXLog.error("Failed pausing client with error: \(error)")
                 }
             }
+        }
+    }
+    
+    private func startClassicSync() {
+        guard classicSyncTask == nil else { return }
+        if !roomSummaryProvider.statePublisher.value.isLoaded {
+            loadingStateSubject.send(.loading)
+        }
+        
+        classicSyncTask = Task { [weak self, client] in
+            while !Task.isCancelled {
+                let listener = SDKListener<SyncResponseV2>.onMainActor { [weak self] _ in
+                    self?.didReceiveClassicSync()
+                }
+                let sync = client.syncV2(settings: .init(), listener: listener)
+                await withTaskCancellationHandler {
+                    while !sync.isFinished() {
+                        do {
+                            try await Task.sleep(for: .seconds(1))
+                        } catch {
+                            break
+                        }
+                    }
+                } onCancel: {
+                    sync.cancel()
+                }
+                
+                guard !Task.isCancelled else { return }
+                self?.syncServiceState = .offline
+                self?.updateHomeserverReachability()
+                do {
+                    try await Task.sleep(for: .seconds(5))
+                } catch {
+                    return
+                }
+            }
+        }
+    }
+    
+    private func didReceiveClassicSync() {
+        guard classicSyncTask != nil else { return }
+        let count = UInt(client.rooms().count { room in
+            switch room.membership() {
+            case .joined, .invited, .knocked:
+                true
+            case .left, .banned:
+                false
+            }
+        })
+        mainRoomSummaryProvider.setClassicSyncRoomCount(count)
+        secondaryRoomSummaryProvider.setClassicSyncRoomCount(count)
+        allRoomSummaryProvider.setClassicSyncRoomCount(count)
+        if loadingStateSubject.value != .notLoading {
+            loadingStateSubject.send(.notLoading)
+        }
+        if syncServiceState != .running {
+            syncServiceState = .running
+            updateHomeserverReachability()
         }
     }
     
@@ -1368,7 +1458,7 @@ class ClientProxy: ClientProxyProtocol {
             case .knocked:
                 return try await .knocked(KnockedRoomProxy(room: room))
             case .joined:
-                let roomProxy = try await JoinedRoomProxy(roomListService: roomListService,
+                let roomProxy = try await JoinedRoomProxy(roomListService: usesClassicSync ? nil : roomListService,
                                                           room: room,
                                                           appSettings: appSettings,
                                                           analyticsService: analyticsService,
@@ -1519,14 +1609,15 @@ private final class ClientDecryptionErrorDelegate: UnableToDecryptDelegate {
 private struct ClientProxyServices {
     let syncService: SyncService
     let roomListService: RoomListService
-    let roomSummaryProvider: RoomSummaryProviderProtocol
-    let alternateRoomSummaryProvider: RoomSummaryProviderProtocol
-    let staticRoomSummaryProvider: StaticRoomSummaryProviderProtocol
+    let roomSummaryProvider: RoomSummaryProvider
+    let alternateRoomSummaryProvider: RoomSummaryProvider
+    let staticRoomSummaryProvider: RoomSummaryProvider
     let eventStringBuilder: RoomEventStringBuilder
     
     init(client: ClientProtocol,
          notificationSettings: NotificationSettingsProxyProtocol,
-         appSettings: AppSettings) async throws {
+         appSettings: AppSettings,
+         usesClassicSync: Bool) async throws {
         let syncService = try await client
             .syncService()
             .withOfflineMode()
@@ -1546,7 +1637,8 @@ private struct ClientProxyServices {
         roomSummaryProvider = RoomSummaryProvider(roomListService: roomListService,
                                                   eventStringBuilder: eventStringBuilder,
                                                   name: "AllRooms",
-                                                  shouldUpdateVisibleRange: true,
+                                                  shouldUpdateVisibleRange: !usesClassicSync,
+                                                  roomListPageSize: usesClassicSync ? .max : 100,
                                                   notificationSettings: notificationSettings,
                                                   appSettings: appSettings)
         try await roomSummaryProvider.setRoomList(roomListService.allRooms())
@@ -1554,6 +1646,7 @@ private struct ClientProxyServices {
         alternateRoomSummaryProvider = RoomSummaryProvider(roomListService: roomListService,
                                                            eventStringBuilder: eventStringBuilder,
                                                            name: "AlternateAllRooms",
+                                                           roomListPageSize: usesClassicSync ? .max : 100,
                                                            notificationSettings: notificationSettings,
                                                            appSettings: appSettings)
         
@@ -1564,26 +1657,31 @@ private struct ClientProxyServices {
                                                         notificationSettings: notificationSettings,
                                                         appSettings: appSettings)
         
-        // Setting a provider's room list will create summaries for every room so
-        // wait until the app is fully running for the alternate and static providers.
-        Task { [roomSummaryProvider, alternateRoomSummaryProvider, staticRoomSummaryProvider] in
-            // Wait for actual content (or a loaded-but-empty account) as the loading state
-            // doesn't take into account the app having build and published any summaries.
-            for await rooms in roomSummaryProvider.roomListPublisher.values {
-                if !rooms.isEmpty {
-                    break
+        if usesClassicSync {
+            try await alternateRoomSummaryProvider.setRoomList(roomListService.allRooms())
+            try await staticRoomSummaryProvider.setRoomList(roomListService.allRooms())
+        } else {
+            // Setting a provider's room list will create summaries for every room so
+            // wait until the app is fully running for the alternate and static providers.
+            Task { [roomSummaryProvider, alternateRoomSummaryProvider, staticRoomSummaryProvider] in
+                // Wait for actual content (or a loaded-but-empty account) as the loading state
+                // doesn't take into account the app having build and published any summaries.
+                for await rooms in roomSummaryProvider.roomListPublisher.values {
+                    if !rooms.isEmpty {
+                        break
+                    }
+                    
+                    if case .loaded(0) = roomSummaryProvider.statePublisher.value {
+                        break
+                    }
                 }
                 
-                if case .loaded(0) = roomSummaryProvider.statePublisher.value {
-                    break
+                do {
+                    try await alternateRoomSummaryProvider.setRoomList(roomListService.allRooms())
+                    try await staticRoomSummaryProvider.setRoomList(roomListService.allRooms())
+                } catch {
+                    fatalError("Failed setting up the deferred room summary providers: \(error)")
                 }
-            }
-            
-            do {
-                try await alternateRoomSummaryProvider.setRoomList(roomListService.allRooms())
-                try await staticRoomSummaryProvider.setRoomList(roomListService.allRooms())
-            } catch {
-                fatalError("Failed setting up the deferred room summary providers: \(error)")
             }
         }
         

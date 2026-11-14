@@ -12,7 +12,7 @@ import MatrixRustSDK
 import UIKit
 
 class JoinedRoomProxy: JoinedRoomProxyProtocol {
-    private let roomListService: RoomListServiceProtocol
+    private let roomListService: RoomListServiceProtocol?
     private let room: RoomProtocol
     private let appSettings: AppSettings
     private let analyticsService: AnalyticsServiceProtocol
@@ -69,7 +69,7 @@ class JoinedRoomProxy: JoinedRoomProxyProtocol {
         knockRequestsStateSubject.asCurrentValuePublisher()
     }
     
-    init(roomListService: RoomListServiceProtocol,
+    init(roomListService: RoomListServiceProtocol?,
          room: RoomProtocol,
          appSettings: AppSettings,
          analyticsService: AnalyticsServiceProtocol,
@@ -114,7 +114,7 @@ class JoinedRoomProxy: JoinedRoomProxyProtocol {
         subscribedForUpdates = true
         
         do {
-            try await roomListService.setRoomSubscriptions(roomIds: [id])
+            try await roomListService?.setRoomSubscriptions(roomIds: [id])
         } catch {
             MXLog.error("Failed subscribing to room with error: \(error)")
         }
