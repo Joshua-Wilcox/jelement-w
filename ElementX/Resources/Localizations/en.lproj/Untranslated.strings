@@ -19,3 +19,10 @@
 "soft_logout_signin_notice" = "Your homeserver (%1$s) admin has signed you out of your account %2$s (%3$s).";
 "soft_logout_signin_title" = "Sign in";
 "untranslated" = "Untranslated";
+"action_summarise_with_apple_intelligence_ios" = "Summarise with Apple Intelligence";
+"common_summarising_voice_message_ios" = "Summarising…";
+"common_voice_message_main_points_ios" = "Main points";
+"common_voice_message_summary_attribution_ios" = "Generated on this device with Apple Intelligence.";
+"error_voice_message_summary_language_ios" = "Apple Intelligence can’t summarise this language.";
+"error_voice_message_summary_unavailable_ios" = "Apple Intelligence is unavailable on this device or isn’t ready yet.";
+"error_voice_message_summary_failed_ios" = "Couldn’t summarise this transcript.";

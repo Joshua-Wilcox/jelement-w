@@ -32,6 +32,76 @@ struct VoiceMessageTranscriptionServiceTests {
     }
     
     @Test
+    func summaryConsidersTheEndOfALongTranscript() async throws {
+        let ending = "The final deadline is Friday."
+        let transcript = String(repeating: "Discussion about a project. ", count: 1000) + ending
+        var receivedChunks = ""
+        let summarizer = VoiceMessageSummarizer { text, isCombining in
+            if !isCombining {
+                receivedChunks += text
+            }
+            return text.contains(ending) ? [ending] : ["Discussed the project."]
+        }
+        
+        let points = try await summarizer.summarize(transcript)
+        #expect(receivedChunks == transcript)
+        #expect(points.contains(ending))
+    }
+    
+    @Test
+    func summarySplitsAgainWhenTheModelReportsAContextLimit() async throws {
+        let text = String(repeating: "🙂", count: 40) + "!"
+        let summarizer = VoiceMessageSummarizer { input, isCombining in
+            if !isCombining, input.count > 20 {
+                throw VoiceMessageSummaryError.contextExceeded
+            }
+            return input.contains("!") || input.contains("Final point") ? ["Final point"] : ["Earlier point"]
+        }
+        
+        #expect(try await summarizer.summarize(text) == ["Final point"])
+    }
+    
+    @Test
+    func summaryFailureAndRetryPreserveTheFullTranscript() async throws {
+        await service.transcribeVoiceMessage(from: source)
+        let state = service.transcriptionState(for: source)
+        let unavailable = deferFulfillment(state.$summaryStatus) { $0 == .failed(.unavailable) }
+        state.summarize(using: .init { _, _ in throw VoiceMessageSummaryError.unavailable })
+        try await unavailable.fulfill()
+        
+        let points = ["Arrive at 5pm."]
+        let completed = deferFulfillment(state.$summaryStatus) { $0 == .completed(points) }
+        state.summarize(using: .init { _, _ in points })
+        try await completed.fulfill()
+        
+        #expect(state.status == .completed(transcript: Self.transcript))
+        #expect(voiceMessageMediaManager.loadVoiceMessageFromSourceBodyCallsCount == 1)
+    }
+    
+    @Test
+    func cancelledSummaryCannotOverwriteARetry() async throws {
+        let state = VoiceMessageTranscriptionState(status: .completed(transcript: Self.transcript))
+        let (started, start) = AsyncStream<Void>.makeStream()
+        let (release, finish) = AsyncStream<Void>.makeStream()
+        state.summarize(using: .init { _, _ in
+            start.yield()
+            var iterator = release.makeAsyncIterator()
+            _ = await iterator.next()
+            return ["Discarded result"]
+        })
+        var iterator = started.makeAsyncIterator()
+        _ = await iterator.next()
+        state.cancelSummary()
+        
+        let points = ["Keep this result"]
+        let completed = deferFulfillment(state.$summaryStatus) { $0 == .completed(points) }
+        state.summarize(using: .init { _, _ in points })
+        finish.finish()
+        try await completed.fulfill()
+        #expect(state.status == .completed(transcript: Self.transcript))
+    }
+    
+    @Test
     func statesAreSharedPerSource() throws {
         let otherSource = try MediaSourceProxy(url: URL("mxc://matrix.org/other-voice-message"), mimeType: "audio/ogg")
         

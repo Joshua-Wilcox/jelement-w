@@ -14,10 +14,24 @@ internal nonisolated enum UntranslatedL10n {
   internal static var a11yVoiceMessagePauseRecordingIos: String { return UntranslatedL10n.tr("Untranslated", "a11y_voice_message_pause_recording_ios") }
   /// Resume recording
   internal static var a11yVoiceMessageResumeRecordingIos: String { return UntranslatedL10n.tr("Untranslated", "a11y_voice_message_resume_recording_ios") }
+  /// Summarise with Apple Intelligence
+  internal static var actionSummariseWithAppleIntelligenceIos: String { return UntranslatedL10n.tr("Untranslated", "action_summarise_with_apple_intelligence_ios") }
   /// Transcribe
   internal static var actionTranscribeIos: String { return UntranslatedL10n.tr("Untranslated", "action_transcribe_ios") }
+  /// Summarising…
+  internal static var commonSummarisingVoiceMessageIos: String { return UntranslatedL10n.tr("Untranslated", "common_summarising_voice_message_ios") }
   /// Transcribing…
   internal static var commonTranscribingIos: String { return UntranslatedL10n.tr("Untranslated", "common_transcribing_ios") }
+  /// Main points
+  internal static var commonVoiceMessageMainPointsIos: String { return UntranslatedL10n.tr("Untranslated", "common_voice_message_main_points_ios") }
+  /// Generated on this device with Apple Intelligence.
+  internal static var commonVoiceMessageSummaryAttributionIos: String { return UntranslatedL10n.tr("Untranslated", "common_voice_message_summary_attribution_ios") }
+  /// Couldn’t summarise this transcript.
+  internal static var errorVoiceMessageSummaryFailedIos: String { return UntranslatedL10n.tr("Untranslated", "error_voice_message_summary_failed_ios") }
+  /// Apple Intelligence can’t summarise this language.
+  internal static var errorVoiceMessageSummaryLanguageIos: String { return UntranslatedL10n.tr("Untranslated", "error_voice_message_summary_language_ios") }
+  /// Apple Intelligence is unavailable on this device or isn’t ready yet.
+  internal static var errorVoiceMessageSummaryUnavailableIos: String { return UntranslatedL10n.tr("Untranslated", "error_voice_message_summary_unavailable_ios") }
   /// Couldn’t transcribe this voice message.
   internal static var errorVoiceMessageTranscriptionFailedIos: String { return UntranslatedL10n.tr("Untranslated", "error_voice_message_transcription_failed_ios") }
   /// Transcription isn’t available in your device’s language.
