@@ -40,6 +40,8 @@ enum RoomDetailsScreenCoordinatorAction {
 
 final class RoomDetailsScreenCoordinator: CoordinatorProtocol {
     private var viewModel: RoomDetailsScreenViewModelProtocol
+    private let clientProxy: ClientProxyProtocol
+    private let roomID: String
     private let isSpace: Bool
     
     private let actionsSubject: PassthroughSubject<RoomDetailsScreenCoordinatorAction, Never> = .init()
@@ -50,6 +52,8 @@ final class RoomDetailsScreenCoordinator: CoordinatorProtocol {
     }
     
     init(parameters: RoomDetailsScreenCoordinatorParameters) {
+        clientProxy = parameters.userSession.clientProxy
+        roomID = parameters.roomProxy.id
         isSpace = parameters.roomProxy.infoPublisher.value.isSpace
         viewModel = RoomDetailsScreenViewModel(roomProxy: parameters.roomProxy,
                                                userSession: parameters.userSession,
@@ -113,7 +117,7 @@ final class RoomDetailsScreenCoordinator: CoordinatorProtocol {
         if isSpace {
             AnyView(SpaceSettingsScreen(context: viewModel.context))
         } else {
-            AnyView(RoomDetailsScreen(context: viewModel.context))
+            AnyView(RoomDetailsScreen(context: viewModel.context, localContactClient: clientProxy, localContactRoomID: roomID))
         }
     }
 }

@@ -14,6 +14,7 @@ struct LoadableAvatarImage: View {
         case roundedRect
     }
     
+    private let localAvatar: Data?
     private let url: URL?
     private let name: String?
     private let contentID: String
@@ -30,7 +31,9 @@ struct LoadableAvatarImage: View {
          shape: LoadableAvatarImage.Shape = .circle,
          avatarSize: Avatars.Size,
          mediaProvider: MediaProviderProtocol?,
+         localAvatar: Data? = nil,
          onTap: ((URL) -> Void)? = nil) {
+        self.localAvatar = localAvatar
         self.url = url
         self.name = name
         self.contentID = contentID
@@ -43,7 +46,7 @@ struct LoadableAvatarImage: View {
     }
     
     var body: some View {
-        if let onTap, let url {
+        if localAvatar == nil, let onTap, let url {
             Button {
                 onTap(url)
             } label: {
@@ -66,7 +69,9 @@ struct LoadableAvatarImage: View {
     
     @ViewBuilder
     private var avatar: some View {
-        if let url {
+        if let localAvatar, let image = UIImage(data: localAvatar) {
+            Image(uiImage: image).resizable().scaledToFill()
+        } else if let url {
             LoadableImage(url: url,
                           mediaType: .avatar,
                           size: avatarSize.scaledSize,

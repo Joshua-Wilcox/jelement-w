@@ -25,6 +25,7 @@ enum UserProfileScreenCoordinatorAction {
 }
 
 final class UserProfileScreenCoordinator: CoordinatorProtocol {
+    private let localContactStore: LocalContactStore?
     private var viewModel: UserProfileScreenViewModelProtocol
     
     private var cancellables = Set<AnyCancellable>()
@@ -35,6 +36,7 @@ final class UserProfileScreenCoordinator: CoordinatorProtocol {
     }
     
     init(parameters: UserProfileScreenCoordinatorParameters) {
+        localContactStore = parameters.userSession.clientProxy.localContactStore
         viewModel = UserProfileScreenViewModel(userID: parameters.userID,
                                                isPresentedModally: parameters.isPresentedModally,
                                                userSession: parameters.userSession,
@@ -64,6 +66,6 @@ final class UserProfileScreenCoordinator: CoordinatorProtocol {
     }
     
     func toPresentable() -> AnyView {
-        AnyView(UserProfileScreen(context: viewModel.context))
+        AnyView(UserProfileScreen(context: viewModel.context, localContactStore: localContactStore))
     }
 }

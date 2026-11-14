@@ -103,6 +103,7 @@ struct RoomAvatarImage: View {
                                     contentID: users[0].id,
                                     avatarSize: avatarSize,
                                     mediaProvider: mediaProvider,
+                                    localAvatar: users[0].localAvatar,
                                     onTap: onAvatarTap)
             }
         case .space(let id, let name, let avatarURL):

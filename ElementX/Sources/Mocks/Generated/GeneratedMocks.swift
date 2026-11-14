@@ -2367,6 +2367,7 @@ nonisolated class ClientProxyMock: ClientProxyProtocol, @unchecked Sendable {
         set(value) { underlyingHomeserverReachabilityPublisher = value }
     }
     nonisolated(unsafe) var underlyingHomeserverReachabilityPublisher: CurrentValuePublisher<HomeserverReachability, Never>!
+    nonisolated(unsafe) var localContactStore: LocalContactStore?
     var userID: String {
         get { return underlyingUserID }
         set(value) { underlyingUserID = value }

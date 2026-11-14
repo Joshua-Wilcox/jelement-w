@@ -18,6 +18,10 @@ class RoomSummaryProvider: RoomSummaryProviderProtocol {
     private let notificationSettings: NotificationSettingsProxyProtocol
     private let appSettings: AppSettings
     private let usesBeeperRoomPresentation: Bool
+    private var localContactStore: LocalContactStore?
+    private var localContactOwnerID = ""
+    private weak var searchIndex: RoomSummaryProvider?
+    private var searchRoomIDs: [String] = []
     private var beeperPresentations: [String: BeeperRoomPresentation] = [:]
     
     private let roomListPageSize: UInt32
@@ -154,6 +158,17 @@ class RoomSummaryProvider: RoomSummaryProviderProtocol {
         visibleItemRangePublisher.send(range)
     }
     
+    func configureLocalContacts(store: LocalContactStore, ownUserID: String, searchIndex: RoomSummaryProvider? = nil) {
+        localContactStore = store
+        localContactOwnerID = ownUserID
+        self.searchIndex = searchIndex
+        store.changes.sink { [weak self] in self?.publishRooms() }.store(in: &cancellables)
+        searchIndex?.roomListPublisher.sink { [weak self] summaries in
+            self?.refreshLocalSearch(using: summaries)
+        }.store(in: &cancellables)
+        publishRooms()
+    }
+    
     func setFilter(_ filter: RoomSummaryProviderFilter) {
         guard filter != currentFilter else {
             return
@@ -172,12 +187,7 @@ class RoomSummaryProvider: RoomSummaryProviderProtocol {
         case .excludeAll:
             _ = listUpdatesSubscriptionResult?.controller().setFilter(kind: .none)
         case let .search(query):
-            let filters = if appSettings.fuzzyRoomListSearchEnabled {
-                [.fuzzyMatchRoomName(pattern: query)] + baseFilter
-            } else {
-                [.normalizedMatchRoomName(pattern: query)] + baseFilter
-            }
-            _ = listUpdatesSubscriptionResult?.controller().setFilter(kind: .all(filters: filters))
+            applySearch(query, summaries: searchIndex?.roomListPublisher.value ?? [], force: true)
         case .rooms(let roomIDs, let filters):
             var rustFilters = filters.map(rustFilter(for:)) + baseFilter
             
@@ -201,6 +211,25 @@ class RoomSummaryProvider: RoomSummaryProviderProtocol {
     
     // MARK: - Private
     
+    private func refreshLocalSearch(using summaries: [RoomSummary]) {
+        guard case let .search(query) = currentFilter else { return }
+        applySearch(query, summaries: summaries, force: false)
+    }
+    
+    private func applySearch(_ query: String, summaries: [RoomSummary], force: Bool) {
+        let matchingIDs = summaries.compactMap { summary in
+            guard let contact = summary.contact(ownUserID: localContactOwnerID),
+                  localContactStore?.contact(for: contact.id)?.name?.localizedStandardContains(query) == true else { return nil as String? }
+            return summary.id
+        }.sorted()
+        guard force || matchingIDs != searchRoomIDs else { return }
+        searchRoomIDs = matchingIDs
+        let nameFilter: RoomListEntriesDynamicFilterKind = appSettings.fuzzyRoomListSearchEnabled ? .fuzzyMatchRoomName(pattern: query) : .normalizedMatchRoomName(pattern: query)
+        let match: RoomListEntriesDynamicFilterKind = matchingIDs.isEmpty ? nameFilter : .any(filters: [nameFilter, .identifiers(identifiers: matchingIDs)])
+        let base: RoomListEntriesDynamicFilterKind = .any(filters: [.all(filters: [.nonSpace, .nonLeft]), .all(filters: [.space, .invite])])
+        _ = listUpdatesSubscriptionResult?.controller().setFilter(kind: .all(filters: [match, base, .deduplicateVersions]))
+    }
+    
     private func rustFilter(for filter: RoomListFilter) -> RoomListEntriesDynamicFilterKind {
         if usesBeeperRoomPresentation, filter == .people || filter == .rooms {
             return .joined
@@ -209,7 +238,7 @@ class RoomSummaryProvider: RoomSummaryProviderProtocol {
     }
     
     private func publishRooms() {
-        guard usesBeeperRoomPresentation else {
+        guard usesBeeperRoomPresentation || localContactStore != nil else {
             roomListSubject.send(rooms)
             return
         }
@@ -233,7 +262,9 @@ class RoomSummaryProvider: RoomSummaryProviderProtocol {
             if let expectedDM, (summary.isDM ?? summary.isDirect) != expectedDM {
                 return nil
             }
-            return summary
+            guard let contact = summary.contact(ownUserID: localContactOwnerID),
+                  let override = localContactStore?.contact(for: contact.id) else { return summary }
+            return summary.applying(override, to: contact)
         }
         roomListSubject.send(presentedRooms)
     }

@@ -116,6 +116,7 @@ protocol ClientProxyProtocol: AnyObject {
     
     var homeserverReachabilityPublisher: CurrentValuePublisher<HomeserverReachability, Never> { get }
     
+    var localContactStore: LocalContactStore? { get }
     var userID: String { get }
     
     var deviceID: String? { get }
