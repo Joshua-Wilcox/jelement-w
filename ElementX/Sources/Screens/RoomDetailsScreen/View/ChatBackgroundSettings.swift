@@ -23,7 +23,7 @@ struct ChatBackgroundSettings: View {
     }
     
     var body: some View {
-        NavigationStack {
+        ElementNavigationStack {
             Form {
                 Section {
                     ChatBackgroundSurface(background: selection)
