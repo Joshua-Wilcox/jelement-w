@@ -27,6 +27,7 @@ nonisolated struct RoomSummary {
     
     let room: Room
     var isDM: Bool?
+    private(set) var bridgedContact: UserProfile?
     
     let id: String
     
@@ -180,6 +181,7 @@ nonisolated extension RoomSummary {
             result.isDM = false
             result.isDirect = false
         case .direct(let contact):
+            result.bridgedContact = contact
             result.isDM = true
             result.isDirect = true
             result.name = contact.displayName.flatMap { $0.isEmpty ? nil : $0 } ?? contact.id
