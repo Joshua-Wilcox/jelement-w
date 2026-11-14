@@ -14,6 +14,24 @@ struct SessionDirectoriesTests {
     let fileManager = FileManager.default
     
     @Test
+    func rebaseSessionMovedByAppUpdate() throws {
+        let name = UUID().uuidString
+        let oldContainer = URL(filePath: "/var/mobile/Containers/Data/Application/\(UUID().uuidString)")
+        let oldData = oldContainer.appending(path: "Library/Application Support/ElementX/Sessions/\(name)")
+        let oldCache = oldContainer.appending(path: "Library/Caches/ElementX/Sessions/\(name)")
+        let saved = SessionDirectories(dataDirectory: oldData, cacheDirectory: oldCache)
+        let current = SessionDirectories(dataDirectory: .sessionsBaseDirectory.appending(component: name))
+        defer { current.delete() }
+        
+        #expect(saved.rebasedToCurrentContainer() == saved)
+        
+        try fileManager.createDirectory(at: current.dataDirectory, withIntermediateDirectories: true)
+        try Data().write(to: current.dataDirectory.appending(component: "matrix-sdk-crypto.sqlite3"))
+        
+        #expect(saved.rebasedToCurrentContainer() == current)
+    }
+    
+    @Test
     func initWithDataDirectory() {
         // Given only a session directory without a caches directory.
         let sessionDirectoryName = UUID().uuidString

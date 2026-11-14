@@ -65,6 +65,22 @@ nonisolated struct SessionDirectories: Hashable, Codable {
         FileManager.default.fileExists(atPath: dataPath.appending("/matrix-sdk-crypto.sqlite3"))
     }
     
+    /// A personal build stores sessions in its application container, whose path can change on update.
+    func rebasedToCurrentContainer() -> Self {
+        guard !isNonTransientUserDataValid(),
+              let applicationDirectoryIndex = dataDirectory.pathComponents.firstIndex(of: "Application"),
+              dataDirectory.pathComponents.prefix(applicationDirectoryIndex).suffix(2) == ["Containers", "Data"],
+              let oldContainerID = dataDirectory.pathComponents.dropFirst(applicationDirectoryIndex + 1).first,
+              UUID(uuidString: oldContainerID) != nil else {
+            return self
+        }
+        
+        let sessionDirectoryName = dataDirectory.lastPathComponent
+        let rebased = Self(dataDirectory: .sessionsBaseDirectory.appending(component: sessionDirectoryName),
+                           cacheDirectory: .sessionCachesBaseDirectory.appending(component: sessionDirectoryName))
+        return rebased.isNonTransientUserDataValid() ? rebased : self
+    }
+    
     private func deleteFiles(at url: URL, with prefix: String) throws {
         let sessionDirectoryContents = try FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)
         for url in sessionDirectoryContents where url.lastPathComponent.hasPrefix(prefix) {
