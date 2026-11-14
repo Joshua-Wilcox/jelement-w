@@ -17,6 +17,8 @@ class RoomSummaryProvider: RoomSummaryProviderProtocol {
     private let shouldUpdateVisibleRange: Bool
     private let notificationSettings: NotificationSettingsProxyProtocol
     private let appSettings: AppSettings
+    private let usesBeeperRoomPresentation: Bool
+    private var beeperPresentations: [String: BeeperRoomPresentation] = [:]
     
     private let roomListPageSize: UInt32
     /// Remember how many rooms we had on the previous requests so we can deduplicate
@@ -53,7 +55,7 @@ class RoomSummaryProvider: RoomSummaryProviderProtocol {
     
     private var rooms: [RoomSummary] = [] {
         didSet {
-            roomListSubject.send(rooms)
+            publishRooms()
         }
     }
     
@@ -68,13 +70,15 @@ class RoomSummaryProvider: RoomSummaryProviderProtocol {
          shouldUpdateVisibleRange: Bool = false,
          roomListPageSize: UInt32 = 100,
          notificationSettings: NotificationSettingsProxyProtocol,
-         appSettings: AppSettings) {
+         appSettings: AppSettings,
+         usesBeeperRoomPresentation: Bool = false) {
         self.roomListService = roomListService
         self.eventStringBuilder = eventStringBuilder
         self.name = name
         self.shouldUpdateVisibleRange = shouldUpdateVisibleRange
         self.notificationSettings = notificationSettings
         self.appSettings = appSettings
+        self.usesBeeperRoomPresentation = usesBeeperRoomPresentation
         self.roomListPageSize = roomListPageSize
         
         let (diffsStream, diffsContinuation) = AsyncStream<[RoomListEntriesUpdate]>.makeStream()
@@ -140,6 +144,12 @@ class RoomSummaryProvider: RoomSummaryProviderProtocol {
         stateSubject.send(.loaded(totalNumberOfRooms: count))
     }
     
+    func setBeeperPresentations(_ presentations: [String: BeeperRoomPresentation]) {
+        guard beeperPresentations != presentations else { return }
+        beeperPresentations = presentations
+        publishRooms()
+    }
+    
     func updateVisibleRange(_ range: Range<Int>) {
         visibleItemRangePublisher.send(range)
     }
@@ -150,6 +160,9 @@ class RoomSummaryProvider: RoomSummaryProviderProtocol {
         }
         
         currentFilter = filter
+        if usesBeeperRoomPresentation {
+            publishRooms()
+        }
         
         let baseFilter: [RoomListEntriesDynamicFilterKind] = [.any(filters: [.all(filters: [.nonSpace, .nonLeft]),
                                                                              .all(filters: [.space, .invite])]),
@@ -166,7 +179,7 @@ class RoomSummaryProvider: RoomSummaryProviderProtocol {
             }
             _ = listUpdatesSubscriptionResult?.controller().setFilter(kind: .all(filters: filters))
         case .rooms(let roomIDs, let filters):
-            var rustFilters = filters.map(\.rustFilter) + baseFilter
+            var rustFilters = filters.map(rustFilter(for:)) + baseFilter
             
             rustFilters.append(.identifiers(identifiers: Array(roomIDs)))
             
@@ -176,7 +189,7 @@ class RoomSummaryProvider: RoomSummaryProviderProtocol {
             
             _ = listUpdatesSubscriptionResult?.controller().setFilter(kind: .all(filters: rustFilters))
         case let .all(filters):
-            var rustFilters = filters.map(\.rustFilter) + baseFilter
+            var rustFilters = filters.map(rustFilter(for:)) + baseFilter
             
             if !filters.contains(.lowPriority), appSettings.lowPriorityFilterEnabled {
                 rustFilters.append(.nonLowPriority)
@@ -187,6 +200,43 @@ class RoomSummaryProvider: RoomSummaryProviderProtocol {
     }
     
     // MARK: - Private
+    
+    private func rustFilter(for filter: RoomListFilter) -> RoomListEntriesDynamicFilterKind {
+        if usesBeeperRoomPresentation, filter == .people || filter == .rooms {
+            return .joined
+        }
+        return filter.rustFilter
+    }
+    
+    private func publishRooms() {
+        guard usesBeeperRoomPresentation else {
+            roomListSubject.send(rooms)
+            return
+        }
+        if currentFilter == .excludeAll {
+            roomListSubject.send([])
+            return
+        }
+        let filters: Set<RoomListFilter> = switch currentFilter {
+        case .all(let filters), .rooms(_, let filters): filters
+        default: []
+        }
+        let expectedDM: Bool? = if filters.contains(.people) {
+            true
+        } else if filters.contains(.rooms) {
+            false
+        } else {
+            nil
+        }
+        let presentedRooms = rooms.compactMap { room -> RoomSummary? in
+            let summary = room.applying(beeperPresentations[room.id])
+            if let expectedDM, (summary.isDM ?? summary.isDirect) != expectedDM {
+                return nil
+            }
+            return summary
+        }
+        roomListSubject.send(presentedRooms)
+    }
     
     private func setupVisibleRangeObservers() {
         // Unthrottled to add another page half way through the last one
@@ -375,6 +425,7 @@ class RoomSummaryProvider: RoomSummaryProviderProtocol {
         }
         
         return RoomSummary(room: room,
+                           isDM: roomInfo.isDm,
                            id: roomInfo.id,
                            joinRequestType: joinRequestType,
                            name: roomInfo.displayName ?? roomInfo.id,

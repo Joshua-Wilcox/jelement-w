@@ -31,6 +31,7 @@ class ClientProxy: ClientProxyProtocol {
     private var syncService: SyncService
     private let usesClassicSync: Bool
     private var classicSyncTask: Task<Void, Never>?
+    private var beeperMetadataTask: Task<Void, Never>?
     // periphery: ignore - only for retain
     private var syncServiceStateUpdateTaskHandle: TaskHandle?
     
@@ -168,6 +169,7 @@ class ClientProxy: ClientProxyProtocol {
     
     deinit {
         classicSyncTask?.cancel()
+        beeperMetadataTask?.cancel()
         // Stop the sync and cancel the delegate (in that order) before the client is released. No need to pause
         // the client as it's being deallocated, so the SDK tears it down anyway. Capture the sync service strongly
         // as `self` is being deallocated.
@@ -1211,8 +1213,12 @@ class ClientProxy: ClientProxyProtocol {
             if usesClassicSync {
                 let task = classicSyncTask
                 classicSyncTask = nil
+                let metadataTask = beeperMetadataTask
+                beeperMetadataTask = nil
+                metadataTask?.cancel()
                 task?.cancel()
                 await task?.value
+                await metadataTask?.value
             } else {
                 MXLog.info("Stopping sync")
                 await syncService.stop()
@@ -1232,6 +1238,7 @@ class ClientProxy: ClientProxyProtocol {
     
     private func startClassicSync() {
         guard classicSyncTask == nil else { return }
+        startBeeperMetadataSync()
         if !roomSummaryProvider.statePublisher.value.isLoaded {
             loadingStateSubject.send(.loading)
         }
@@ -1261,6 +1268,52 @@ class ClientProxy: ClientProxyProtocol {
                     try await Task.sleep(for: .seconds(5))
                 } catch {
                     return
+                }
+            }
+        }
+    }
+    
+    private func startBeeperMetadataSync() {
+        beeperMetadataTask = Task { [weak self, client] in
+            var metadata = BeeperRoomMetadata()
+            var since: String?
+            let network = URLSession(configuration: .ephemeral)
+            defer { network.invalidateAndCancel() }
+            
+            while !Task.isCancelled {
+                do {
+                    let session = try client.session()
+                    var components = URLComponents()
+                    components.scheme = "https"
+                    components.host = "matrix.beeper.com"
+                    components.path = "/_matrix/client/v3/sync"
+                    components.queryItems = [
+                        .init(name: "filter", value: BeeperRoomMetadata.syncFilter),
+                        .init(name: "timeout", value: since == nil ? "0" : "30000"),
+                        .init(name: "set_presence", value: "offline")
+                    ]
+                    if let since {
+                        components.queryItems?.append(.init(name: "since", value: since))
+                    }
+                    guard let url = components.url else { return }
+                    var request = URLRequest(url: url)
+                    request.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+                    let (data, response) = try await network.data(for: request)
+                    try Task.checkCancellation()
+                    guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                        throw URLError(.badServerResponse)
+                    }
+                    let update = try JSONDecoder().decode(BeeperRoomMetadata.Response.self, from: data)
+                    since = update.nextBatch
+                    let presentations = metadata.apply(update, ownUserID: session.userId)
+                    guard let self else { return }
+                    mainRoomSummaryProvider.setBeeperPresentations(presentations)
+                    secondaryRoomSummaryProvider.setBeeperPresentations(presentations)
+                    allRoomSummaryProvider.setBeeperPresentations(presentations)
+                } catch {
+                    guard !Task.isCancelled else { return }
+                    MXLog.verbose("Beeper room metadata sync failed")
+                    try? await Task.sleep(for: .seconds(10))
                 }
             }
         }
@@ -1640,7 +1693,8 @@ private struct ClientProxyServices {
                                                   shouldUpdateVisibleRange: !usesClassicSync,
                                                   roomListPageSize: usesClassicSync ? .max : 100,
                                                   notificationSettings: notificationSettings,
-                                                  appSettings: appSettings)
+                                                  appSettings: appSettings,
+                                                  usesBeeperRoomPresentation: usesClassicSync)
         try await roomSummaryProvider.setRoomList(roomListService.allRooms())
         
         alternateRoomSummaryProvider = RoomSummaryProvider(roomListService: roomListService,
@@ -1648,14 +1702,16 @@ private struct ClientProxyServices {
                                                            name: "AlternateAllRooms",
                                                            roomListPageSize: usesClassicSync ? .max : 100,
                                                            notificationSettings: notificationSettings,
-                                                           appSettings: appSettings)
+                                                           appSettings: appSettings,
+                                                           usesBeeperRoomPresentation: usesClassicSync)
         
         staticRoomSummaryProvider = RoomSummaryProvider(roomListService: roomListService,
                                                         eventStringBuilder: eventStringBuilder,
                                                         name: "StaticAllRooms",
                                                         roomListPageSize: .max,
                                                         notificationSettings: notificationSettings,
-                                                        appSettings: appSettings)
+                                                        appSettings: appSettings,
+                                                        usesBeeperRoomPresentation: usesClassicSync)
         
         if usesClassicSync {
             try await alternateRoomSummaryProvider.setRoomList(roomListService.allRooms())

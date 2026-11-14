@@ -26,17 +26,18 @@ nonisolated struct RoomSummary {
     enum LastMessageState { case sending, failed }
     
     let room: Room
+    var isDM: Bool?
     
     let id: String
     
     let joinRequestType: JoinRequestType?
     
-    let name: String
-    let isDirect: Bool
+    var name: String
+    var isDirect: Bool
     let isSpace: Bool
-    let avatarURL: URL?
+    var avatarURL: URL?
     
-    let heroes: [UserProfile]
+    var heroes: [UserProfile]
     let activeMembersCount: UInt
     
     let lastMessage: AttributedString?
@@ -171,6 +172,23 @@ nonisolated extension RoomSummary {
     }
     
     /// This doesn't have to work properly for DM invites, the heroes are always empty
+    func applying(_ presentation: BeeperRoomPresentation?) -> RoomSummary {
+        guard let presentation else { return self }
+        var result = self
+        switch presentation {
+        case .group:
+            result.isDM = false
+            result.isDirect = false
+        case .direct(let contact):
+            result.isDM = true
+            result.isDirect = true
+            result.name = contact.displayName.flatMap { $0.isEmpty ? nil : $0 } ?? contact.id
+            result.avatarURL = nil
+            result.heroes = [contact]
+        }
+        return result
+    }
+    
     var avatar: RoomAvatar {
         guard !isTombstoned else {
             return .tombstoned
