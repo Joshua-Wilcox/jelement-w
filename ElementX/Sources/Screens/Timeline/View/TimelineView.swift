@@ -12,10 +12,11 @@ import WysiwygComposer
 
 struct TimelineView: View {
     @ObservedObject var timelineContext: TimelineViewModel.Context
+    var showsChatBackground = false
     @State private var dragOver = false
     
     var body: some View {
-        TimelineViewRepresentable()
+        TimelineViewRepresentable(showsChatBackground: showsChatBackground)
             .id(timelineContext.viewState.roomID)
             // It is tempting to inject these environment values last to avoid also injecting them into the sheets,
             // and that approach works great on iOS. But it doesn't work on macOS (as of 15.5) where the app goes 💥
@@ -85,6 +86,8 @@ struct TimelineView: View {
 struct TimelineViewRepresentable: UIViewControllerRepresentable {
     @EnvironmentObject private var viewModelContext: TimelineViewModel.Context
     
+    var showsChatBackground = false
+    
     func makeUIViewController(context: Context) -> TimelineTableViewController {
         TimelineTableViewController(coordinator: context.coordinator,
                                     isScrolledToBottom: $viewModelContext.isScrolledToBottom,
@@ -97,6 +100,7 @@ struct TimelineViewRepresentable: UIViewControllerRepresentable {
     }
     
     func updateUIViewController(_ uiViewController: TimelineTableViewController, context: Context) {
+        uiViewController.showsChatBackground = showsChatBackground
         context.coordinator.update(tableViewController: uiViewController)
     }
     

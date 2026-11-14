@@ -20,6 +20,7 @@ struct SessionSecurityState: Equatable {
 
 // sourcery: AutoMockable
 protocol UserSessionProtocol: Sendable {
+    var chatBackgroundStore: ChatBackgroundStore? { get }
     var clientProxy: ClientProxyProtocol { get }
     var mediaProvider: MediaProviderProtocol { get }
     var voiceMessageMediaManager: VoiceMessageMediaManagerProtocol { get }

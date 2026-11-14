@@ -14,6 +14,7 @@ class UserSession: UserSessionProtocol {
     
     private var authErrorCancellable: AnyCancellable?
     
+    let chatBackgroundStore: ChatBackgroundStore?
     let clientProxy: ClientProxyProtocol
     let mediaProvider: MediaProviderProtocol
     
@@ -36,7 +37,9 @@ class UserSession: UserSessionProtocol {
          mediaProvider: MediaProviderProtocol,
          voiceMessageMediaManager: VoiceMessageMediaManagerProtocol,
          voiceMessageTranscriptionService: VoiceMessageTranscriptionServiceProtocol?,
-         liveLocationManager: LiveLocationManagerProtocol) {
+         liveLocationManager: LiveLocationManagerProtocol,
+         chatBackgroundStore: ChatBackgroundStore? = nil) {
+        self.chatBackgroundStore = chatBackgroundStore
         self.clientProxy = clientProxy
         self.mediaProvider = mediaProvider
         self.voiceMessageMediaManager = voiceMessageMediaManager

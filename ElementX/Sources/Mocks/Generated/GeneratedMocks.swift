@@ -14332,6 +14332,7 @@ nonisolated class UserNotificationCenterMock: UserNotificationCenterProtocol, @u
     }
 }
 nonisolated class UserSessionMock: UserSessionProtocol, @unchecked Sendable {
+    nonisolated(unsafe) var chatBackgroundStore: ChatBackgroundStore?
     var clientProxy: ClientProxyProtocol {
         get { return underlyingClientProxy }
         set(value) { underlyingClientProxy = value }
