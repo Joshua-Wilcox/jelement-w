@@ -23,6 +23,36 @@ final class RoomScreenViewModelTests {
     }
     
     @Test
+    func bridgedDMHeaderUsesTheContact() {
+        let roomProxy = JoinedRoomProxyMock(.init(id: "!bridge:test", name: "Contact and bridge bot"))
+        let summaries = CurrentValueSubject<[RoomSummary], Never>([])
+        let provider = RoomSummaryProviderMock(.init())
+        provider.roomListPublisher = summaries.asCurrentValuePublisher()
+        let clientProxy = ClientProxyMock(.init())
+        clientProxy.staticRoomSummaryProvider = provider
+        
+        let viewModel = RoomScreenViewModel(userSession: UserSessionMock(.init(clientProxy: clientProxy)),
+                                            roomProxy: roomProxy,
+                                            initialSelectedPinnedEventID: nil,
+                                            ongoingCallRoomIDPublisher: .init(.init(nil)),
+                                            appSettings: appSettings,
+                                            appHooks: AppHooks(),
+                                            analyticsService: AnalyticsServiceMock(.init()),
+                                            userIndicatorController: UserIndicatorControllerMock())
+        #expect(viewModel.context.viewState.roomTitle == "Contact and bridge bot")
+        
+        let contact = UserProfile(userID: "@contact:test", displayName: "Contact", avatarURL: URL(string: "mxc://test/avatar"))
+        let summary = RoomSummary.mock(id: roomProxy.id, name: "Contact and bridge bot")
+        summaries.send([summary.applying(.direct(contact))])
+        #expect(viewModel.context.viewState.roomTitle == "Contact")
+        #expect(viewModel.context.viewState.roomAvatar == .heroes([contact]))
+        
+        summaries.send([summary.applying(.group)])
+        #expect(viewModel.context.viewState.roomTitle == "Contact and bridge bot")
+        #expect(viewModel.context.viewState.roomAvatar == roomProxy.infoPublisher.value.avatar)
+    }
+    
+    @Test
     func pinnedEventsBanner() async throws {
         var configuration = JoinedRoomProxyMockConfiguration()
         let (stream, continuation) = AsyncStream.makeStream(of: TimelineProxyProtocol.self)

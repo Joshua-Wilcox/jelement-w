@@ -185,6 +185,16 @@ class RoomScreenViewModel: RoomScreenViewModelType, RoomScreenViewModelProtocol 
             }
             .store(in: &cancellables)
         
+        clientProxy.staticRoomSummaryProvider.roomListPublisher
+            .map { [roomID = roomProxy.id] in $0.first { $0.id == roomID }?.bridgedContact }
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] contact in
+                guard let self else { return }
+                updateRoomHeader(roomProxy.infoPublisher.value, bridgedContact: contact)
+            }
+            .store(in: &cancellables)
+        
         let identityStatusChangesPublisher = roomProxy.identityStatusChangesPublisher.receive(on: DispatchQueue.main)
         
         Task { [weak self] in
@@ -335,10 +345,22 @@ class RoomScreenViewModel: RoomScreenViewModelType, RoomScreenViewModelProtocol 
         }
     }
     
+    private func updateRoomHeader(_ roomInfo: RoomInfoProxyProtocol, bridgedContact: UserProfile?) {
+        if let bridgedContact {
+            state.roomTitle = bridgedContact.displayName.flatMap { $0.isEmpty ? nil : $0 } ?? bridgedContact.id
+            state.roomAvatar = .heroes([bridgedContact])
+            state.dmRecipientDetails.statusEmoji = bridgedContact.status.displayed?.emoji
+        } else {
+            state.roomTitle = roomInfo.displayName ?? roomProxy.id
+            state.roomAvatar = roomInfo.avatar
+            state.dmRecipientDetails.statusEmoji = roomInfo.statusEmoji
+        }
+    }
+    
     private func updateRoomInfo(_ roomInfo: RoomInfoProxyProtocol) {
-        state.roomTitle = roomInfo.displayName ?? roomProxy.id
-        state.roomAvatar = roomInfo.avatar
-        state.dmRecipientDetails.statusEmoji = roomInfo.statusEmoji
+        let bridgedContact = clientProxy.staticRoomSummaryProvider.roomListPublisher.value
+            .first { $0.id == roomProxy.id }?.bridgedContact
+        updateRoomHeader(roomInfo, bridgedContact: bridgedContact)
         state.hasOngoingCall = roomInfo.hasRoomCall
         state.activeRoomCallIntent = roomInfo.activeRoomCallIntent
         state.hasSuccessor = roomInfo.successor != nil
