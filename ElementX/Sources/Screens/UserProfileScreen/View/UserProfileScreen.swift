@@ -11,10 +11,16 @@ import SwiftUI
 
 struct UserProfileScreen: View {
     @Bindable var context: UserProfileScreenViewModel.Context
+    var localContactStore: LocalContactStore?
     
     var body: some View {
         Form {
             headerSection
+            if let localContactStore, !context.viewState.isOwnUser {
+                LocalContactRow(profile: context.viewState.userProfile ?? .init(userID: context.viewState.userID),
+                                store: localContactStore,
+                                mediaProvider: context.mediaProvider)
+            }
         }
         .compoundList()
         .navigationTitle(L10n.screenRoomMemberDetailsTitle)
@@ -36,7 +42,7 @@ struct UserProfileScreen: View {
     @ViewBuilder
     private var headerSection: some View {
         if let userProfile = context.viewState.userProfile {
-            AvatarHeaderView(user: userProfile,
+            AvatarHeaderView(user: localContactStore?.contact(for: userProfile.id)?.applying(to: userProfile) ?? userProfile,
                              isVerified: context.viewState.showVerifiedBadge,
                              avatarSize: .user(on: .memberDetails),
                              mediaProvider: context.mediaProvider) { url in

@@ -14,10 +14,24 @@ internal nonisolated enum UntranslatedL10n {
   internal static var a11yVoiceMessagePauseRecordingIos: String { return UntranslatedL10n.tr("Untranslated", "a11y_voice_message_pause_recording_ios") }
   /// Resume recording
   internal static var a11yVoiceMessageResumeRecordingIos: String { return UntranslatedL10n.tr("Untranslated", "a11y_voice_message_resume_recording_ios") }
+  /// Choose photo
+  internal static var actionChooseLocalContactPhotoIos: String { return UntranslatedL10n.tr("Untranslated", "action_choose_local_contact_photo_ios") }
+  /// Use profile name
+  internal static var actionClearLocalContactNameIos: String { return UntranslatedL10n.tr("Untranslated", "action_clear_local_contact_name_ios") }
+  /// Use profile photo
+  internal static var actionClearLocalContactPhotoIos: String { return UntranslatedL10n.tr("Untranslated", "action_clear_local_contact_photo_ios") }
+  /// Edit local contact
+  internal static var actionEditLocalContactIos: String { return UntranslatedL10n.tr("Untranslated", "action_edit_local_contact_ios") }
   /// Transcribe
   internal static var actionTranscribeIos: String { return UntranslatedL10n.tr("Untranslated", "action_transcribe_ios") }
+  /// These changes are only visible to you on this device.
+  internal static var commonLocalContactExplanationIos: String { return UntranslatedL10n.tr("Untranslated", "common_local_contact_explanation_ios") }
+  /// Local name
+  internal static var commonLocalContactNameIos: String { return UntranslatedL10n.tr("Untranslated", "common_local_contact_name_ios") }
   /// Transcribing…
   internal static var commonTranscribingIos: String { return UntranslatedL10n.tr("Untranslated", "common_transcribing_ios") }
+  /// Couldn’t update the local contact.
+  internal static var errorLocalContactIos: String { return UntranslatedL10n.tr("Untranslated", "error_local_contact_ios") }
   /// Couldn’t transcribe this voice message.
   internal static var errorVoiceMessageTranscriptionFailedIos: String { return UntranslatedL10n.tr("Untranslated", "error_voice_message_transcription_failed_ios") }
   /// Transcription isn’t available in your device’s language.

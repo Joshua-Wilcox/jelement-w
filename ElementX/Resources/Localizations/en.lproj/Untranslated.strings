@@ -19,3 +19,10 @@
 "soft_logout_signin_notice" = "Your homeserver (%1$s) admin has signed you out of your account %2$s (%3$s).";
 "soft_logout_signin_title" = "Sign in";
 "untranslated" = "Untranslated";
+"action_edit_local_contact_ios" = "Edit local contact";
+"common_local_contact_name_ios" = "Local name";
+"action_clear_local_contact_name_ios" = "Use profile name";
+"action_choose_local_contact_photo_ios" = "Choose photo";
+"action_clear_local_contact_photo_ios" = "Use profile photo";
+"common_local_contact_explanation_ios" = "These changes are only visible to you on this device.";
+"error_local_contact_ios" = "Couldn’t update the local contact.";

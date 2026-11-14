@@ -7,11 +7,14 @@
 //
 
 import Compound
+import MatrixRustSDK
 import SwiftUI
 
 struct RoomDetailsScreen: View {
     @Bindable var context: RoomDetailsScreenViewModel.Context
     
+    var localContactClient: ClientProxyProtocol?
+    var localContactRoomID: String?
     @State private var isTopicExpanded = false
     
     var body: some View {
@@ -29,6 +32,14 @@ struct RoomDetailsScreen: View {
                 profileSection
             } else {
                 peopleSection
+            }
+            
+            if let localContactClient, let localContactRoomID,
+               let store = localContactClient.localContactStore {
+                RoomLocalContactRow(store: store, roomID: localContactRoomID,
+                                    ownUserID: localContactClient.userID,
+                                    summaries: localContactClient.staticRoomSummaryProvider.roomListPublisher,
+                                    mediaProvider: context.mediaProvider)
             }
             
             configurationSection
@@ -356,8 +367,6 @@ struct RoomDetailsScreen: View {
 }
 
 // MARK: - Previews
-
-import MatrixRustSDK
 
 @available(iOS 26.0, *)
 struct RoomDetailsScreen_Previews: PreviewProvider, TestablePreview {

@@ -10,12 +10,14 @@ import Foundation
 import MatrixRustSDK
 
 nonisolated struct UserProfile: Hashable, Identifiable {
+    let localAvatar: Data?
     let id: String
     let displayName: String?
     let avatarURL: URL?
     let status: UserStatus
     
-    init(userID: String, displayName: String? = nil, avatarURL: URL? = nil, status: UserStatus = .init()) {
+    init(userID: String, displayName: String? = nil, avatarURL: URL? = nil, status: UserStatus = .init(), localAvatar: Data? = nil) {
+        self.localAvatar = localAvatar
         id = userID
         self.displayName = displayName
         self.avatarURL = avatarURL
@@ -23,6 +25,7 @@ nonisolated struct UserProfile: Hashable, Identifiable {
     }
     
     init(member: RoomMemberDetails) {
+        localAvatar = nil
         id = member.id
         displayName = member.isBanned ? nil : member.name
         avatarURL = member.isBanned ? nil : member.avatarURL
@@ -30,6 +33,7 @@ nonisolated struct UserProfile: Hashable, Identifiable {
     }
     
     init(sender: TimelineItemSender) {
+        localAvatar = nil
         id = sender.id
         displayName = sender.displayName
         avatarURL = sender.avatarURL
@@ -37,6 +41,7 @@ nonisolated struct UserProfile: Hashable, Identifiable {
     }
     
     init(rustUserProfile: MatrixRustSDK.UserProfile) {
+        localAvatar = nil
         id = rustUserProfile.userId
         displayName = rustUserProfile.displayName
         avatarURL = rustUserProfile.avatarUrl.flatMap(URL.init(string:))
@@ -44,6 +49,7 @@ nonisolated struct UserProfile: Hashable, Identifiable {
     }
     
     init(rustRoomHero: MatrixRustSDK.RoomHero) {
+        localAvatar = nil
         id = rustRoomHero.userId
         displayName = rustRoomHero.displayName
         avatarURL = rustRoomHero.avatarUrl.flatMap(URL.init(string:))

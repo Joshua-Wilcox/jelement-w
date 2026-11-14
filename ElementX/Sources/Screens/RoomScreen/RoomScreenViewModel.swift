@@ -186,12 +186,14 @@ class RoomScreenViewModel: RoomScreenViewModelType, RoomScreenViewModelProtocol 
             .store(in: &cancellables)
         
         clientProxy.staticRoomSummaryProvider.roomListPublisher
-            .map { [roomID = roomProxy.id] in $0.first { $0.id == roomID }?.bridgedContact }
+            .map { [roomID = roomProxy.id] summaries in
+                summaries.first { $0.id == roomID }.flatMap(Self.headerContact)
+            }
             .removeDuplicates()
             .dropFirst()
             .sink { [weak self] contact in
                 guard let self else { return }
-                updateRoomHeader(roomProxy.infoPublisher.value, bridgedContact: contact)
+                updateRoomHeader(roomProxy.infoPublisher.value, contact: contact)
             }
             .store(in: &cancellables)
         
@@ -345,11 +347,22 @@ class RoomScreenViewModel: RoomScreenViewModelType, RoomScreenViewModelProtocol 
         }
     }
     
-    private func updateRoomHeader(_ roomInfo: RoomInfoProxyProtocol, bridgedContact: UserProfile?) {
-        if let bridgedContact {
-            state.roomTitle = bridgedContact.displayName.flatMap { $0.isEmpty ? nil : $0 } ?? bridgedContact.id
-            state.roomAvatar = .heroes([bridgedContact])
-            state.dmRecipientDetails.statusEmoji = bridgedContact.status.displayed?.emoji
+    private struct HeaderContact: Equatable {
+        let name: String
+        let avatar: RoomAvatar
+        let statusEmoji: Character?
+    }
+    
+    private static func headerContact(_ summary: RoomSummary) -> HeaderContact? {
+        guard summary.localContact != nil || summary.bridgedContact != nil else { return nil }
+        return .init(name: summary.name, avatar: summary.avatar, statusEmoji: summary.statusEmoji)
+    }
+    
+    private func updateRoomHeader(_ roomInfo: RoomInfoProxyProtocol, contact: HeaderContact?) {
+        if let contact {
+            state.roomTitle = contact.name
+            state.roomAvatar = contact.avatar
+            state.dmRecipientDetails.statusEmoji = contact.statusEmoji
         } else {
             state.roomTitle = roomInfo.displayName ?? roomProxy.id
             state.roomAvatar = roomInfo.avatar
@@ -358,9 +371,9 @@ class RoomScreenViewModel: RoomScreenViewModelType, RoomScreenViewModelProtocol 
     }
     
     private func updateRoomInfo(_ roomInfo: RoomInfoProxyProtocol) {
-        let bridgedContact = clientProxy.staticRoomSummaryProvider.roomListPublisher.value
-            .first { $0.id == roomProxy.id }?.bridgedContact
-        updateRoomHeader(roomInfo, bridgedContact: bridgedContact)
+        let contact = clientProxy.staticRoomSummaryProvider.roomListPublisher.value
+            .first { $0.id == roomProxy.id }.flatMap(Self.headerContact)
+        updateRoomHeader(roomInfo, contact: contact)
         state.hasOngoingCall = roomInfo.hasRoomCall
         state.activeRoomCallIntent = roomInfo.activeRoomCallIntent
         state.hasSuccessor = roomInfo.successor != nil

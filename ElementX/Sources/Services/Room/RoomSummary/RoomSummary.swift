@@ -28,6 +28,7 @@ nonisolated struct RoomSummary {
     let room: Room
     var isDM: Bool?
     private(set) var bridgedContact: UserProfile?
+    private(set) var localContact: UserProfile?
     
     let id: String
     
@@ -191,11 +192,32 @@ nonisolated extension RoomSummary {
         return result
     }
     
+    func contact(ownUserID: String) -> UserProfile? {
+        guard joinRequestType == nil, !isSpace, !isTombstoned else { return nil }
+        if let bridgedContact {
+            return bridgedContact
+        }
+        guard isDM == true else { return nil }
+        let peers = heroes.filter { $0.id != ownUserID }
+        return peers.count == 1 ? peers.first : nil
+    }
+    
+    @MainActor
+    func applying(_ override: LocalContactOverride, to contact: UserProfile) -> RoomSummary {
+        var summary = self
+        summary.localContact = override.applying(to: contact)
+        summary.name = override.name ?? name
+        return summary
+    }
+    
     var avatar: RoomAvatar {
         guard !isTombstoned else {
             return .tombstoned
         }
         
+        if let localContact, localContact.localAvatar != nil || avatarURL == nil {
+            return .heroes([localContact])
+        }
         if isSpace {
             return .space(id: id, name: name, avatarURL: avatarURL)
         } else if isDirect, avatarURL == nil, heroes.count == 1 {

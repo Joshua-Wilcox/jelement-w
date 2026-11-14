@@ -14,6 +14,7 @@ import OrderedCollections
 
 // swiftlint:disable:next type_body_length
 class ClientProxy: ClientProxyProtocol {
+    let localContactStore: LocalContactStore?
     private let client: ClientProtocol
     private let networkMonitor: NetworkMonitorProtocol
     private let appSettings: AppSettings
@@ -223,7 +224,9 @@ class ClientProxy: ClientProxyProtocol {
     init(client: ClientProtocol,
          networkMonitor: NetworkMonitorProtocol,
          appSettings: AppSettings,
-         analyticsService: AnalyticsServiceProtocol) async throws {
+         analyticsService: AnalyticsServiceProtocol,
+         localContactStore: LocalContactStore? = nil) async throws {
+        self.localContactStore = localContactStore
         self.client = client
         self.networkMonitor = networkMonitor
         self.appSettings = appSettings
@@ -296,6 +299,14 @@ class ClientProxy: ClientProxyProtocol {
                 MXLog.error("Received background task early termination")
             }
         })
+        
+        if let localContactStore {
+            let ownUserID = userID
+            let fullList = allRoomSummaryProvider
+            fullList.configureLocalContacts(store: localContactStore, ownUserID: ownUserID)
+            mainRoomSummaryProvider.configureLocalContacts(store: localContactStore, ownUserID: ownUserID, searchIndex: fullList)
+            secondaryRoomSummaryProvider.configureLocalContacts(store: localContactStore, ownUserID: ownUserID, searchIndex: fullList)
+        }
         
         try await client.setUtdDelegate(utdDelegate: ClientDecryptionErrorDelegate(actionsSubject: actionsSubject))
         

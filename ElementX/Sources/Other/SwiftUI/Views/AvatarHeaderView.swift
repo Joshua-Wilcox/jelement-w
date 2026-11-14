@@ -200,6 +200,7 @@ struct AvatarHeaderView<Footer: View>: View {
                                 contentID: userProfile.id,
                                 avatarSize: avatarSize,
                                 mediaProvider: mediaProvider,
+                                localAvatar: userProfile.localAvatar,
                                 onTap: onAvatarTap)
                 .accessibilityLabel(avatarAccessibilityLabel)
         }
