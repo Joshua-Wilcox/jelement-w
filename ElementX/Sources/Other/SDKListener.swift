@@ -92,6 +92,12 @@ nonisolated extension SDKListener: MediaPreviewConfigListener where T == MediaPr
     }
 }
 
+nonisolated extension SDKListener: SyncListenerV2 where T == SyncResponseV2 {
+    func onUpdate(response: SyncResponseV2) {
+        onUpdateClosure(response)
+    }
+}
+
 nonisolated extension SDKListener: SyncServiceStateObserver where T == SyncServiceState {
     func onUpdate(state: SyncServiceState) {
         onUpdateClosure(state)

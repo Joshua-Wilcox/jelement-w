@@ -135,6 +135,11 @@ class RoomSummaryProvider: RoomSummaryProviderProtocol {
         }
     }
     
+    func setClassicSyncRoomCount(_ count: UInt) {
+        guard stateSubject.value.totalNumberOfRooms != count else { return }
+        stateSubject.send(.loaded(totalNumberOfRooms: count))
+    }
+    
     func updateVisibleRange(_ range: Range<Int>) {
         visibleItemRangePublisher.send(range)
     }
