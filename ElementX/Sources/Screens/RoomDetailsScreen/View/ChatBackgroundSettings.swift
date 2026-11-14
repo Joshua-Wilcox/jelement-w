@@ -77,7 +77,7 @@ struct ChatBackgroundSettings: View {
     }
     
     private func choice(_ title: String, _ background: ChatBackground) -> some View {
-        ListRow(label: .default(title: title), kind: .button {
+        ListRow(label: .plain(title: title), kind: .button {
             selection = background
         })
         .accessibilityAddTraits(selection == background ? .isSelected : [])

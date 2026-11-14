@@ -37,7 +37,7 @@ struct RoomDetailsScreen: View {
             
             if chatBackgroundStore != nil, roomID != nil {
                 Section {
-                    ListRow(label: .default(title: UntranslatedL10n.screenRoomDetailsChatBackgroundIos),
+                    ListRow(label: .plain(title: UntranslatedL10n.screenRoomDetailsChatBackgroundIos),
                             kind: .button { showsChatBackground = true })
                 }
             }
